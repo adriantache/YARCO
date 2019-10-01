@@ -2,8 +2,8 @@
 // @name        Yet Another Reddit Comment Overwriter
 // @namespace   https://github.com/adriantache/YARCO/
 // @description Local script to overwrite all your comments with random ASCII characters and delete them. This works because Reddit doesn't store editing history, so technically this is the only way to obfuscate the contents of the comments. Based on Reddit Overwrite script v.1.4.8.
-// @include     https://*.reddit.com/*
-// @include     http://*.reddit.com/*
+// @include     https://*.reddit.com/user/*
+// @include     http://*.reddit.com/user/*
 // @version     0.1
 // @run-at      document-start
 // ==/UserScript==
@@ -12,234 +12,276 @@
 // TODO only delete comments older than a day
 // TODO only delete comments from a certain subreddit
 // TODO check feedback for Reddit Overwrite for extra features
+// TODO consider caching comments array
+// TODO test Overview page
+// TODO add STOP button
+// TODO add optional confirmation dialog
 
-unsafeWindow.to_delete = [];
-unsafeWindow.num_user_comments = 0;
-unsafeWindow.deleted = 0;
-unsafeWindow.span = '';
+
+// reddit username
 unsafeWindow.user = '';
+// array of comments (more precisely author tags)
+unsafeWindow.comments = [];
+// number of detected user comments
+// TODO refactor this out
+unsafeWindow.num_user_comments = 0;
+// top section contents
+unsafeWindow.span = '';
 
-window.addEventListener("DOMContentLoaded", add_delete_links, false);
+//TODO refactor these out
+unsafeWindow.to_delete = [];
+unsafeWindow.deleted = 0;
 
-function add_delete_links(ev) {
+//EXTRA OPTIONS
+let generate_individual_delete_buttons = false //disabled by default
+let time_between_actions = 2000 //reddit API limit is 60 actions per minute so don't exceed that
+
+// on page loaded, initialize the script
+window.addEventListener("DOMContentLoaded", init_script, false);
+
+function init_script(ev) {
+    // get logged in username
     unsafeWindow.user = document.querySelector("span.user > a:not(.login-required)").innerHTML;
-    if (!unsafeWindow.user) {
-        return;
-    }
-    var comments = document.querySelectorAll("a.author");
-    unsafeWindow.num_user_comments = 0;
-    for (var i = 0; i < comments.length; i++) {
-        if (comments[i].innerHTML != unsafeWindow.user) 
-            continue;
-        
 
-        try {
-            var main_parent = comments[i].parentNode.parentNode;
-            var thing_id = main_parent.querySelector("form > input[name='thing_id']").value;
-            var list = main_parent.querySelector("ul.flat-list");
-            if (list.querySelector("li.secure_delete")) 
-                continue;
-            
+    // if not logged in exit
+    if (!unsafeWindow.user) return;
 
-            unsafeWindow.num_user_comments ++;
+    //retrieve all VISIBLE comments
+    get_comments()
 
-            var addedlink = document.createElement("li");
-            addedlink.setAttribute('class', 'secure_delete');
-            var dlink = document.createElement("a");
-            dlink.setAttribute('class', 'bylink secure_delete');
-            dlink.setAttribute('onClick', 'javascript:var ret = overwrite_comment("' + thing_id + '", false);');
-            dlink.setAttribute('href', 'javascript:void(0)');
-            dlink.appendChild(document.createTextNode('SECURE DELETE'));
-            addedlink.appendChild(dlink);
-            main_parent.querySelector("ul.flat-list").appendChild(addedlink);
-        } catch (e) {
-            alert("Error adding Secure Delete links to comments.\nError: " + e + " Stack:" + e.stack);
-        }
-    }
+    // generate the top buttons
+    generate_top_buttons();
+}
 
-    unsafeWindow.span = document.createElement("span");
-    unsafeWindow.span.setAttribute('class', 'nextprev secure_delete_all');
-    UpdateDeleteAllSpan();
+function get_comments() {
+    // find all author tags to eventually get comments
+    let comments = document.querySelectorAll("a.author");
 
+    // filter out other authors
+    unsafeWindow.comments = [].filter.call(comments, filter_author)
+
+    unsafeWindow.num_user_comments = unsafeWindow.comments.length;
 }
 
 // append buttons to page
-function UpdateDeleteAllSpan() {
+function generate_top_buttons() {
     if (unsafeWindow.num_user_comments) {
+        unsafeWindow.span = document.createElement("div");
+        unsafeWindow.span.setAttribute('class', 'nextprev secure_delete_all');
         unsafeWindow.span.innerHTML = "";
+        unsafeWindow.span.style.marginBottom = "10px";
 
-        // make Delete All link
-        var dlink = document.createElement("a");
-        dlink.setAttribute('class', 'bylink');
-        dlink.setAttribute('onClick', 'javascript:return delete_all()');
-        dlink.setAttribute('href', 'javascript:void(0)');
-        dlink.style.marginRight = "10px";
-        dlink.appendChild(document.createTextNode('OVERWRITE AND DELETE ALL COMMENTS'));
-        unsafeWindow.span.appendChild(dlink);
+        // make Overwrite and Delete All link
+        let odlink = document.createElement("a");
+        odlink.setAttribute('class', 'bylink');
+        odlink.setAttribute('onClick', 'javascript:return recursive_process(true, true)');
+        odlink.setAttribute('href', 'javascript:void(0)');
+        odlink.style.marginLeft = "10px";
+        odlink.appendChild(document.createTextNode('OVERWRITE AND DELETE ' +
+            unsafeWindow.comments.length +
+            ' COMMENTS'));
+        unsafeWindow.span.appendChild(odlink);
+        let br = document.createElement("br");
+        unsafeWindow.span.appendChild(br);
 
         // make Overwrite All link
-        var olink = document.createElement("a");
+        let olink = document.createElement("a");
         olink.setAttribute('class', 'bylink');
-        olink.setAttribute('onClick', 'javascript:return overwrite_all()');
+        olink.setAttribute('onClick', 'javascript:return recursive_process(true, false)');
         olink.setAttribute('href', 'javascript:void(0)');
-        dlink.style.marginRight = "10px";
-        olink.appendChild(document.createTextNode('OVERWRITE ALL COMMENTS'));
+        olink.style.marginLeft = "10px";
+        olink.style.position = "relative";
+        olink.style.top = "5px";
+        olink.appendChild(document.createTextNode('OVERWRITE ' +
+            unsafeWindow.comments.length +
+            ' COMMENTS'));
         unsafeWindow.span.appendChild(olink);
+        let br2 = document.createElement("br");
+        unsafeWindow.span.appendChild(br2);
+
+        // make Delete All link
+        let dlink = document.createElement("a");
+        dlink.setAttribute('class', 'bylink');
+        dlink.setAttribute('onClick', 'javascript:return recursive_process(false, true)');
+        dlink.setAttribute('href', 'javascript:void(0)');
+        dlink.style.marginLeft = "10px";
+        dlink.style.position = "relative";
+        dlink.style.top = "10px";
+        dlink.appendChild(document.createTextNode('DELETE ' +
+        unsafeWindow.comments.length +
+        ' COMMENTS'));
+        unsafeWindow.span.appendChild(dlink);
+        
+        // TODO test status message
+        // let status_message = document.createTextNode("p");
+        // status_message.innerHTML = "STATUS";
+        // status_message.style.marginLeft = "10px";
+        // status_message.style.position = "relative";
+        // status_message.style.top = "10px";
+        // unsafeWindow.span.appendChild(status_message);
 
         document.querySelector("div.content").insertBefore(unsafeWindow.span, document.querySelector("div.content").firstChild);
+
+        //add per comment buttons (inactive by default)
+        if(generate_individual_delete_buttons) generate_delete_buttons()
     } else if (unsafeWindow.span != null) {
         unsafeWindow.span.style.display = 'none';
     }
 }
 
-// TODO add method just for deleting all
-unsafeWindow.delete_all = function () {
-    try {
-        unsafeWindow.num_user_comments = 0;
-        unsafeWindow.deleted = 0;
-        unsafeWindow.to_delete = [];
-        var comments = document.querySelectorAll("a.author");
+unsafeWindow.recursive_process = function (overwrite_all, delete_all) {
+    //get comments again in case the user has scrolled and revealed more comments
+    get_comments()
 
-        for (var i = 0; i < comments.length; i++) {
-            if (comments[i].innerHTML != unsafeWindow.user) 
-                continue;
-            
+    let commentsArray = [];
 
-            var thing_id = comments[i].parentNode.parentNode.querySelector("form.usertext > input[name='thing_id']").value;
-            if (unsafeWindow.to_delete.indexOf(thing_id) == -1) {
-                unsafeWindow.to_delete.push(thing_id);
-                unsafeWindow.num_user_comments ++;
-            }
+    for (let i = 0; i < unsafeWindow.comments.length; i++) {
+        //for each author, get ID of the input field of the comment
+        let thing_id = comments[i].parentNode.parentNode.querySelector("form.usertext > input[name='thing_id']").value;
+
+        if (commentsArray.indexOf(thing_id) == -1) {
+            commentsArray.push(thing_id);
+            //TODO refactor this out
+            unsafeWindow.num_user_comments++;
         }
-
-        unsafeWindow.span.innerHTML = "TRYING TO Overwrite COMMENT 1 OF " + unsafeWindow.num_user_comments;
-        var next_thing_id = unsafeWindow.to_delete.pop();
-        unsafeWindow.overwrite_comment(next_thing_id, true);
-    } catch (e) {
-        alert("YOU ARE MOST LIKELY NOT ON THE COMMENTS TAB! /n/n Error trying to delete all your comments.\nError: " + e + " Stack:" + e.stack);
-        unsafeWindow.location.reload()
     }
-};
 
-// TODO write this function
-unsafeWindow.overwrite_all = function () {
-    try {
-        unsafeWindow.num_user_comments = 0;
-        unsafeWindow.deleted = 0;
-        unsafeWindow.to_delete = [];
-        var comments = document.querySelectorAll("a.author");
-
-        for (var i = 0; i < comments.length; i++) {
-            if (comments[i].innerHTML != unsafeWindow.user) 
-                continue;
-            
-
-            var thing_id = comments[i].parentNode.parentNode.querySelector("form.usertext > input[name='thing_id']").value;
-            if (unsafeWindow.to_delete.indexOf(thing_id) == -1) {
-                unsafeWindow.to_delete.push(thing_id);
-                unsafeWindow.num_user_comments ++;
-            }
-        }
-
-        unsafeWindow.span.innerHTML = "TRYING TO Overwrite COMMENT 1 OF " + unsafeWindow.num_user_comments;
-        var next_thing_id = unsafeWindow.to_delete.pop();
-        unsafeWindow.overwrite_comment(next_thing_id, true);
-    } catch (e) {
-        alert("YOU ARE MOST LIKELY NOT ON THE COMMENTS TAB! /n/n Error trying to delete all your comments.\nError: " + e + " Stack:" + e.stack);
-        unsafeWindow.location.reload()
-    }
-};
-
-unsafeWindow.delete_comment = function (thing_id, from_delete_all) {
-    try {
-        var thing = document.querySelector("input[name='thing_id'][value='" + thing_id + "']");
-
-        var status = thing.parentNode.querySelector("div.usertext-edit > div.bottom-area > div.usertext-buttons > span.status").innerHTML;
-
-        var error = false;
-        if ((status.indexOf("error") != -1) || (status.indexOf("submitting") != -1)) {
-            error = true;
-        } else {
-            var del_form = thing.parentNode.parentNode.querySelector("ul.buttons > li > form.del-button");
-            unsafeWindow.toggle(del_form.querySelector("span.main > a"));
-            del_form.querySelector("span.error > a.yes").click();
-            unsafeWindow.deleted ++;
-        }
-
-        if (from_delete_all) {
-            if (unsafeWindow.to_delete.length != 0) {
-                unsafeWindow.span.innerHTML = "OVERWRITING COMMENT " + (
-                    unsafeWindow.deleted + 1
-                ) + " OF " + unsafeWindow.num_user_comments;
-                var next_thing_id = unsafeWindow.to_delete.pop();
-                unsafeWindow.setTimeout(unsafeWindow.overwrite_comment, 2000, next_thing_id, from_delete_all);
-            } else {
-                if (unsafeWindow.num_user_comments - unsafeWindow.deleted != 0) {
-                    unsafeWindow.num_user_comments = unsafeWindow.num_user_comments - unsafeWindow.deleted;
-                    UpdateDeleteAllSpan();
-                    unsafeWindow.span.innerHTML = "<span>Failed to overwrite " + unsafeWindow.num_user_comments + " comments</span><br>" + unsafeWindow.span.innerHTML;
-                } else {
-                    unsafeWindow.span.style.display = 'none';
-                }
-            }
-        } else {
-            if (error) {
-                alert("Failed to overwrite your comment. Overwrite aborted.");
-            } else {
-                unsafeWindow.num_user_comments --;
-            }
-            UpdateDeleteAllSpan();
-        }
-        return(error ? -1 : 0);
-    } catch (er) {
-        alert(er);
-        if (from_delete_all) 
-            unsafeWindow.location.reload();
-        
-
-        return -99;
+    if (overwrite_all && delete_all) {
+        overwrite_all(commentsArray, true);
+    } else if (overwrite_all) {
+        overwrite_all(commentsArray, false);
+    } else if (delete_all) {
+        delete_all(commentsArray);
     }
 }
 
-unsafeWindow.overwrite_comment = function (thing_id, from_delete_all) {
+function overwrite_all(comments, also_delete) {
+    //get next comment id
+    let thing_id = comments.pop();
+
+    //overwrite the next comment in the stack
+    overwrite_comment(thing_id);
+
+    //if also deleting, add a timeout and delete the comment
+    if (also_delete) unsafeWindow.setTimeout(delete_comment(thing_id), time_between_actions);
+
+    //if there are still comments left, get next comment
+    //increase timeout if also deleting 
+    if (comments.length) unsafeWindow.setTimeout(overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments);
+}
+
+function delete_all(comments) {
+    delete_comment(comments.pop());
+
+    //if there are still comments left, get next comment 
+    if (comments.length) unsafeWindow.setTimeout(delete_all, time_between_actions, comments);
+}
+
+function overwrite_comment(thing_id) {
     try {
-        var edit_form = document.querySelector("input[name='thing_id'][value='" + thing_id + "']").parentNode;
+        //find edit form (hidden on page but active)
+        let edit_form = document.querySelector("input[name='thing_id'][value='" + thing_id + "']").parentNode;
 
-        edit_form.querySelector("div.usertext-edit > div.bottom-area > div.usertext-buttons > button.cancel").click();
+        //if comment is currently being edited, cancel out of that 
+        let edit_cancel_btn = edit_form.querySelector("div.usertext-edit > div.bottom-area > div.usertext-buttons > button.cancel");
+        edit_cancel_btn.click();
 
+        //find edit button and click it
+        let edit_btn = edit_form.parentNode.querySelector("ul > li > a.edit-usertext");
+        if (edit_btn) edit_btn.click();
 
-        var edit_btn = edit_form.parentNode.querySelector("ul > li > a.edit-usertext");
-        if (edit_btn) 
-            edit_btn.click();
-        
-
-        var edit_textbox = edit_form.querySelector("div.usertext-edit > div > textarea");
-        var repl_str = '';
-        var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz><.-,+!#$%^&*();:[]~";
-        for (var x = 0; x < edit_textbox.value.length; x++) {
-            if (edit_textbox.value.substr(x, 1) == '\n') {
+        //find edit textbox and replace the string with random chars
+        let edit_textbox = edit_form.querySelector("div.usertext-edit > div > textarea");
+        let repl_str = '';
+        let chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz><.-,+!#$%^&*();:[]~";
+        for (let i = 0; i < edit_textbox.value.length; i++) {
+            if (edit_textbox.value.substr(i, 1) == '\n') {
                 repl_str += '\n';
             } else {
-                var rnum = Math.floor(Math.random() * chars.length);
-                repl_str += chars.charAt(rnum, 1);
+                let random_char = Math.floor(Math.random() * chars.length);
+                repl_str += chars.charAt(random_char, 1);
             }
         }
 
+        //set edited value to the random string
         edit_textbox.value = repl_str;
-        //        var sumting = '^^^^^^^^^^^^^^^^' + Math.random();
-        //      var sumtingtr = sumting.substring(0,22);
 
-        //    var sumting2 = '' + Math.random();
-        // var sumtingtr2 = sumting2.substring(2,7);
-
-
-        // edit_textbox.value = sumtingtr + sumtingtr2;
-
-        edit_form.querySelector("div.usertext-edit > div.bottom-area > div.usertext-buttons > button.save").click();
-        unsafeWindow.setTimeout(unsafeWindow.delete_comment, 2000, thing_id, from_delete_all);
-        return 0;
+        //find save comment button and click it
+        let edit_save_btn = edit_form.querySelector("div.usertext-edit > div.bottom-area > div.usertext-buttons > button.save");
+        edit_save_btn.click();
     } catch (e) {
         alert("Error interacting with overwrite form: " + e);
-        return -99;
     }
-};
+}
+
+function delete_comment(thing_id) {
+    try {
+        // get current status of comment editing box to prevent deleting comment before overwrite is complete
+        let thing = document.querySelector("input[name='thing_id'][value='" + thing_id + "']");
+        let status = thing.parentNode.querySelector("div.usertext-edit > div.bottom-area > div.usertext-buttons > span.status").innerHTML;
+
+        if (status.indexOf("error") != -1) {
+            alert("Failed to overwrite comment " + thing_id + " due to an unknown reddit error, skipping.");
+            return;
+        }
+
+        // if status is submitting, there may be an internet connectivity error, so we retry
+        if (status.indexOf("submitting") != -1) {
+            unsafeWindow.setTimeout(delete_comment, time_between_actions * 5, thing_id);
+            return;
+        }
+
+        // find delete button and click it and then yes confirmation button
+        let del_form = thing.parentNode.parentNode.querySelector("ul.buttons > li > form.del-button");
+        unsafeWindow.toggle(del_form.querySelector("span.main > a"));
+        del_form.querySelector("span.error > a.yes").click();
+
+    } catch (e) {
+        alert("Error deleting comment: " + e);
+    }
+}
+
+//(UTILITY FUNCTIONS)
+function filter_author(comment) {
+    return comment.innerHTML == unsafeWindow.user
+}
+
+
+//[UNUSED FUNCTIONS]
+//Add a "SECURE DELETE" button near each comment delete button
+//TODO refactor this
+//TODO add overwrite button
+function generate_delete_buttons() {
+
+    for (let i = 0; i < comments.length; i++) {
+        // skip comments by anyone else
+        if (comments[i].innerHTML != unsafeWindow.user) continue;
+
+        try {
+            // get the parent
+            let main_parent = comments[i].parentNode.parentNode;
+            let thing_id = main_parent.querySelector("form > input[name='thing_id']").value;
+            let list = main_parent.querySelector("ul.flat-list");
+
+            // if it already contains the tag, skip
+            if (list.querySelector("li.secure_delete")) continue;
+
+            unsafeWindow.num_user_comments++;
+
+            let addedlink = document.createElement("li");
+            addedlink.setAttribute('class', 'secure_delete');
+
+            let dlink = document.createElement("a");
+            dlink.setAttribute('class', 'bylink secure_delete');
+            // TODO test let here
+            dlink.setAttribute('onClick', 'javascript:var ret = overwrite_comment("' + thing_id + '", false);');
+            dlink.setAttribute('href', 'javascript:void(0)');
+            dlink.appendChild(document.createTextNode('SECURE DELETE'));
+            addedlink.appendChild(dlink);
+
+            main_parent.querySelector("ul.flat-list").appendChild(addedlink);
+        } catch (e) {
+            alert("Error adding Secure Delete links to comments.\nError: " + e + " Stack:" + e.stack);
+        }
+    }
+}
