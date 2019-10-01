@@ -108,10 +108,10 @@ function generate_top_buttons() {
         dlink.style.position = "relative";
         dlink.style.top = "10px";
         dlink.appendChild(document.createTextNode('DELETE ' +
-        unsafeWindow.comments.length +
-        ' COMMENTS'));
+            unsafeWindow.comments.length +
+            ' COMMENTS'));
         unsafeWindow.span.appendChild(dlink);
-        
+
         // TODO test status message
         // let status_message = document.createTextNode("p");
         // status_message.innerHTML = "STATUS";
@@ -123,7 +123,7 @@ function generate_top_buttons() {
         document.querySelector("div.content").insertBefore(unsafeWindow.span, document.querySelector("div.content").firstChild);
 
         //add per comment buttons (inactive by default)
-        if(generate_individual_delete_buttons) generate_delete_buttons()
+        if (generate_individual_delete_buttons) generate_delete_buttons()
     } else if (unsafeWindow.span != null) {
         unsafeWindow.span.style.display = 'none';
     }
@@ -137,7 +137,7 @@ unsafeWindow.recursive_process = function (overwrite_all, delete_all) {
 
     for (let i = 0; i < unsafeWindow.comments.length; i++) {
         //for each author, get ID of the input field of the comment
-        let thing_id = comments[i].parentNode.parentNode.querySelector("form.usertext > input[name='thing_id']").value;
+        let thing_id = unsafeWindow.comments[i].parentNode.parentNode.querySelector("form.usertext > input[name='thing_id']").value;
 
         if (commentsArray.indexOf(thing_id) == -1) {
             commentsArray.push(thing_id);
@@ -147,37 +147,37 @@ unsafeWindow.recursive_process = function (overwrite_all, delete_all) {
     }
 
     if (overwrite_all && delete_all) {
-        overwrite_all(commentsArray, true);
+        unsafeWindow.overwrite_all(commentsArray, true);
     } else if (overwrite_all) {
-        overwrite_all(commentsArray, false);
+        unsafeWindow.overwrite_all(commentsArray, false);
     } else if (delete_all) {
-        delete_all(commentsArray);
+        unsafeWindow.delete_all(commentsArray);
     }
 }
 
-function overwrite_all(comments, also_delete) {
+unsafeWindow.overwrite_all = function (comments, also_delete) {
     //get next comment id
-    let thing_id = comments.pop();
+    let thing_id = comments.shift();
 
     //overwrite the next comment in the stack
-    overwrite_comment(thing_id);
+    unsafeWindow.overwrite_comment(thing_id);
 
     //if also deleting, add a timeout and delete the comment
-    if (also_delete) unsafeWindow.setTimeout(delete_comment(thing_id), time_between_actions);
+    if (also_delete) unsafeWindow.setTimeout(unsafeWindow.delete_comment(thing_id), time_between_actions);
 
     //if there are still comments left, get next comment
     //increase timeout if also deleting 
-    if (comments.length) unsafeWindow.setTimeout(overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments);
+    if (comments.length) unsafeWindow.setTimeout(unsafeWindow.overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments);
 }
 
-function delete_all(comments) {
-    delete_comment(comments.pop());
+unsafeWindow.delete_all = function (comments) {
+    delete_comment(comments.shift());
 
     //if there are still comments left, get next comment 
     if (comments.length) unsafeWindow.setTimeout(delete_all, time_between_actions, comments);
 }
 
-function overwrite_comment(thing_id) {
+unsafeWindow.overwrite_comment = function (thing_id) {
     try {
         //find edit form (hidden on page but active)
         let edit_form = document.querySelector("input[name='thing_id'][value='" + thing_id + "']").parentNode;
@@ -214,7 +214,7 @@ function overwrite_comment(thing_id) {
     }
 }
 
-function delete_comment(thing_id) {
+unsafeWindow.delete_comment = function (thing_id) {
     try {
         // get current status of comment editing box to prevent deleting comment before overwrite is complete
         let thing = document.querySelector("input[name='thing_id'][value='" + thing_id + "']");
