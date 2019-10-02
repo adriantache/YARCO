@@ -8,6 +8,12 @@
 // @run-at      document-start
 // ==/UserScript==
 
+
+//EXTRA OPTIONS
+let generate_individual_delete_buttons = true //disabled by default
+let time_between_actions = 2000 //reddit API limit is 60 actions per minute so don't exceed that
+
+
 // TODO separate overwrite and delete
 // TODO only delete comments older than a day
 // TODO only delete comments from a certain subreddit
@@ -16,6 +22,7 @@
 // TODO test Overview page
 // TODO add STOP button
 // TODO add optional confirmation dialog
+// TODO add status message while processing 
 
 
 // reddit username
@@ -32,9 +39,6 @@ unsafeWindow.span = '';
 unsafeWindow.to_delete = [];
 unsafeWindow.deleted = 0;
 
-//EXTRA OPTIONS
-let generate_individual_delete_buttons = false //disabled by default
-let time_between_actions = 2000 //reddit API limit is 60 actions per minute so don't exceed that
 
 // on page loaded, initialize the script
 window.addEventListener("DOMContentLoaded", init_script, false);
@@ -74,7 +78,7 @@ function generate_top_buttons() {
         // make Overwrite and Delete All link
         let odlink = document.createElement("a");
         odlink.setAttribute('class', 'bylink');
-        odlink.setAttribute('onClick', 'javascript:return recursive_process(true, true)');
+        odlink.setAttribute('onClick', 'javascript: recursive_process(true, true)');
         odlink.setAttribute('href', 'javascript:void(0)');
         odlink.style.marginLeft = "10px";
         odlink.appendChild(document.createTextNode('OVERWRITE AND DELETE ' +
@@ -87,7 +91,7 @@ function generate_top_buttons() {
         // make Overwrite All link
         let olink = document.createElement("a");
         olink.setAttribute('class', 'bylink');
-        olink.setAttribute('onClick', 'javascript:return recursive_process(true, false)');
+        olink.setAttribute('onClick', 'javascript: recursive_process(true, false)');
         olink.setAttribute('href', 'javascript:void(0)');
         olink.style.marginLeft = "10px";
         olink.style.position = "relative";
@@ -102,7 +106,7 @@ function generate_top_buttons() {
         // make Delete All link
         let dlink = document.createElement("a");
         dlink.setAttribute('class', 'bylink');
-        dlink.setAttribute('onClick', 'javascript:return recursive_process(false, true)');
+        dlink.setAttribute('onClick', 'javascript: recursive_process(false, true)');
         dlink.setAttribute('href', 'javascript:void(0)');
         dlink.style.marginLeft = "10px";
         dlink.style.position = "relative";
@@ -122,8 +126,8 @@ function generate_top_buttons() {
 
         document.querySelector("div.content").insertBefore(unsafeWindow.span, document.querySelector("div.content").firstChild);
 
-        //add per comment buttons (inactive by default)
-        if (generate_individual_delete_buttons) generate_delete_buttons()
+        //add per comment buttons (disabled by default)
+        if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons()
     } else if (unsafeWindow.span != null) {
         unsafeWindow.span.style.display = 'none';
     }
@@ -167,14 +171,14 @@ unsafeWindow.overwrite_all = function (comments, also_delete) {
 
     //if there are still comments left, get next comment
     //increase timeout if also deleting 
-    if (comments.length) unsafeWindow.setTimeout(unsafeWindow.overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments);
+    if (comments.length) unsafeWindow.setTimeout(unsafeWindow.overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments, also_delete);
 }
 
 unsafeWindow.delete_all = function (comments) {
-    delete_comment(comments.shift());
+    unsafeWindow.delete_comment(comments.shift());
 
     //if there are still comments left, get next comment 
-    if (comments.length) unsafeWindow.setTimeout(delete_all, time_between_actions, comments);
+    if (comments.length) unsafeWindow.setTimeout(unsafeWindow.delete_all, time_between_actions, comments);
 }
 
 unsafeWindow.overwrite_comment = function (thing_id) {
@@ -227,7 +231,7 @@ unsafeWindow.delete_comment = function (thing_id) {
 
         // if status is submitting, there may be an internet connectivity error, so we retry
         if (status.indexOf("submitting") != -1) {
-            unsafeWindow.setTimeout(delete_comment, time_between_actions * 5, thing_id);
+            unsafeWindow.setTimeout(unsafeWindow.delete_comment, time_between_actions * 5, thing_id);
             return;
         }
 
@@ -241,45 +245,67 @@ unsafeWindow.delete_comment = function (thing_id) {
     }
 }
 
-//(UTILITY FUNCTIONS)
+
+//[UTILITY FUNCTIONS]
 function filter_author(comment) {
     return comment.innerHTML == unsafeWindow.user
 }
 
+unsafeWindow.overwrite_delete = function (thing_id) {
+    unsafeWindow.overwrite_comment(thing_id)
+    unsafeWindow.setTimeout(unsafeWindow.delete_comment, time_between_actions, thing_id)
+}
 
-//[UNUSED FUNCTIONS]
+//function to regenerate secure delete buttons after only overwriting a comment
+unsafeWindow.overwrite_reload = function (thing_id) {
+    unsafeWindow.overwrite_comment(thing_id)
+    unsafeWindow.setTimeout(unsafeWindow.generate_delete_buttons, 500)
+}
+
+
+//[EXTRA FEATURES]
 //Add a "SECURE DELETE" button near each comment delete button
-//TODO refactor this
-//TODO add overwrite button
-function generate_delete_buttons() {
+unsafeWindow.generate_delete_buttons = function () {
+    get_comments()
 
-    for (let i = 0; i < comments.length; i++) {
-        // skip comments by anyone else
-        if (comments[i].innerHTML != unsafeWindow.user) continue;
-
+    for (let i = 0; i < unsafeWindow.comments.length; i++) {
         try {
             // get the parent
-            let main_parent = comments[i].parentNode.parentNode;
+            let main_parent = unsafeWindow.comments[i].parentNode.parentNode;
             let thing_id = main_parent.querySelector("form > input[name='thing_id']").value;
             let list = main_parent.querySelector("ul.flat-list");
 
-            // if it already contains the tag, skip
-            if (list.querySelector("li.secure_delete")) continue;
+            // if it already contains the tags, skip
+            if (list.querySelector("li.secure_delete") && list.querySelector("li.overwrite")) continue;
 
             unsafeWindow.num_user_comments++;
 
-            let addedlink = document.createElement("li");
-            addedlink.setAttribute('class', 'secure_delete');
+            // add SECURE DELETE link to comments
+            let secure_delete_link = document.createElement("li");
+            secure_delete_link.setAttribute('class', 'secure_delete');
 
             let dlink = document.createElement("a");
             dlink.setAttribute('class', 'bylink secure_delete');
-            // TODO test let here
-            dlink.setAttribute('onClick', 'javascript:var ret = overwrite_comment("' + thing_id + '", false);');
+            dlink.setAttribute('onClick', 'javascript: overwrite_delete("' + thing_id + '")');
             dlink.setAttribute('href', 'javascript:void(0)');
             dlink.appendChild(document.createTextNode('SECURE DELETE'));
-            addedlink.appendChild(dlink);
+            secure_delete_link.appendChild(dlink);
 
-            main_parent.querySelector("ul.flat-list").appendChild(addedlink);
+            main_parent.querySelector("ul.flat-list").appendChild(secure_delete_link);
+
+            // add OVERWRITE link to comments
+            let overwrite_link = document.createElement("li");
+            overwrite_link.setAttribute('class', 'overwrite');
+
+            let olink = document.createElement("a");
+            olink.setAttribute('class', 'bylink secure_delete');
+            olink.setAttribute('onClick', 'javascript: overwrite_reload("' + thing_id + '")');
+            olink.setAttribute('href', 'javascript:void(0)');
+            olink.appendChild(document.createTextNode('OVERWRITE'));
+            overwrite_link.appendChild(olink);
+
+            main_parent.querySelector("ul.flat-list").appendChild(overwrite_link);
+
         } catch (e) {
             alert("Error adding Secure Delete links to comments.\nError: " + e + " Stack:" + e.stack);
         }
