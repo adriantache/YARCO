@@ -10,8 +10,9 @@
 
 
 //EXTRA OPTIONS
-let generate_individual_delete_buttons = true //disabled by default
+let generate_individual_delete_buttons = false //generate per comment delete and overwrite links
 let time_between_actions = 2000 //reddit API limit is 60 actions per minute so don't exceed that
+let only_delete_old_comments = true //disabled by default
 
 
 // TODO separate overwrite and delete
@@ -29,15 +30,8 @@ let time_between_actions = 2000 //reddit API limit is 60 actions per minute so d
 unsafeWindow.user = '';
 // array of comments (more precisely author tags)
 unsafeWindow.comments = [];
-// number of detected user comments
-// TODO refactor this out
-unsafeWindow.num_user_comments = 0;
 // top section contents
 unsafeWindow.span = '';
-
-//TODO refactor these out
-unsafeWindow.to_delete = [];
-unsafeWindow.deleted = 0;
 
 
 // on page loaded, initialize the script
@@ -63,13 +57,11 @@ function get_comments() {
 
     // filter out other authors
     unsafeWindow.comments = [].filter.call(comments, filter_author)
-
-    unsafeWindow.num_user_comments = unsafeWindow.comments.length;
 }
 
 // append buttons to page
 function generate_top_buttons() {
-    if (unsafeWindow.num_user_comments) {
+    if (unsafeWindow.comments.length) {
         unsafeWindow.span = document.createElement("div");
         unsafeWindow.span.setAttribute('class', 'nextprev secure_delete_all');
         unsafeWindow.span.innerHTML = "";
@@ -145,8 +137,6 @@ unsafeWindow.recursive_process = function (overwrite_all, delete_all) {
 
         if (commentsArray.indexOf(thing_id) == -1) {
             commentsArray.push(thing_id);
-            //TODO refactor this out
-            unsafeWindow.num_user_comments++;
         }
     }
 
@@ -275,10 +265,12 @@ unsafeWindow.generate_delete_buttons = function () {
             let thing_id = main_parent.querySelector("form > input[name='thing_id']").value;
             let list = main_parent.querySelector("ul.flat-list");
 
+            //TODO REmove this
+            alert(main_parent.querySelector("time").innerHTML)
+            
+
             // if it already contains the tags, skip
             if (list.querySelector("li.secure_delete") && list.querySelector("li.overwrite")) continue;
-
-            unsafeWindow.num_user_comments++;
 
             // add SECURE DELETE link to comments
             let secure_delete_link = document.createElement("li");
