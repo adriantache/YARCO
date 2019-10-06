@@ -10,11 +10,16 @@
 
 
 //EXTRA OPTIONS (disabled by default)
+let show_overwrite_button = false //show separate button to overwrite 
+let show_delete_button = false //show separate button to delete
 let generate_individual_delete_buttons = false //generate per comment delete and overwrite links
 let only_delete_old_comments = false //ignore comments newer than 24 hours
 let only_delete_by_subreddit = false //ignore comments from subreddits other than the one chosen in the dropdown
 let time_between_actions = 2000 //reddit API limit is 60 actions per minute so don't exceed that
-//TODO filter by comment score
+let only_delete_downvoted = false //only delete comments under a certain karma
+let downvote_limit = 1 //if above is active, only delete comments with karma <= to this
+let ignore_upvoted = false //ignore comments over a certain karma (useless if only_delete_downvoted is active)
+let upvote_limit = 100 //if above is active, ignore comments with karma >= to this
 
 // TODO check feedback for Reddit Overwrite for extra features
 // TODO consider caching comments array OR not
@@ -29,13 +34,12 @@ unsafeWindow.user = '';
 unsafeWindow.comments = [];
 // top section contents
 unsafeWindow.div = '';
+//status text
+unsafeWindow.status_message = null;
 
 // subreddit selected for deletion
 unsafeWindow.subreddit = "ALL";
 unsafeWindow.subreddit_array = [];
-
-//status text
-unsafeWindow.status_message = null;
 
 // on page loaded, initialize the script
 window.addEventListener("DOMContentLoaded", init_script, false);
@@ -68,7 +72,17 @@ function get_comments() {
 
     // if active, filter out comments from other subreddits than the chosen one
     if (only_delete_by_subreddit && unsafeWindow.subreddit !== "ALL") {
-        unsafeWindow.comments = [].filter.call(comments, filter_subreddit);
+        unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_subreddit);
+    }
+
+    // if active, filter out non downvoted comments
+    if (only_delete_downvoted) {
+        unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_downvotes)
+    }
+
+    // if active, filter out upvoted comments
+    if (ignore_upvoted) {
+        unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_upvotes)
     }
 
     update_status_text();
@@ -130,25 +144,29 @@ function generate_top_buttons() {
         let br = document.createElement("br");
         unsafeWindow.div.appendChild(br);
 
-        // make Overwrite All link
-        let olink = document.createElement("a");
-        olink.setAttribute('class', 'bylink');
-        olink.setAttribute('onClick', 'javascript: recursive_process(true, false)');
-        olink.setAttribute('href', 'javascript:void(0)');
-        olink.style.marginLeft = "10px";
-        olink.appendChild(document.createTextNode('OVERWRITE'));
-        unsafeWindow.div.appendChild(olink);
-        let br2 = document.createElement("br");
-        unsafeWindow.div.appendChild(br2);
+        if (show_overwrite_button) {
+            // make Overwrite All link
+            let olink = document.createElement("a");
+            olink.setAttribute('class', 'bylink');
+            olink.setAttribute('onClick', 'javascript: recursive_process(true, false)');
+            olink.setAttribute('href', 'javascript:void(0)');
+            olink.style.marginLeft = "10px";
+            olink.appendChild(document.createTextNode('OVERWRITE'));
+            unsafeWindow.div.appendChild(olink);
+            let br2 = document.createElement("br");
+            unsafeWindow.div.appendChild(br2);
+        }
 
-        // make Delete All link
-        let dlink = document.createElement("a");
-        dlink.setAttribute('class', 'bylink');
-        dlink.setAttribute('onClick', 'javascript: recursive_process(false, true)');
-        dlink.setAttribute('href', 'javascript:void(0)');
-        dlink.style.marginLeft = "10px";
-        dlink.appendChild(document.createTextNode('DELETE'));
-        unsafeWindow.div.appendChild(dlink);
+        if (show_delete_button) {
+            // make Delete All link
+            let dlink = document.createElement("a");
+            dlink.setAttribute('class', 'bylink');
+            dlink.setAttribute('onClick', 'javascript: recursive_process(false, true)');
+            dlink.setAttribute('href', 'javascript:void(0)');
+            dlink.style.marginLeft = "10px";
+            dlink.appendChild(document.createTextNode('DELETE'));
+            unsafeWindow.div.appendChild(dlink);
+        }
 
         //add our div to the webpage
         document.querySelector("div.content").insertBefore(unsafeWindow.div, document.querySelector("div.content").firstChild);
@@ -284,6 +302,14 @@ function filter_subreddit(comment) {
     return comment.parentNode.parentNode.parentNode.querySelector("a.subreddit").innerHTML == unsafeWindow.subreddit;
 }
 
+function filter_downvotes(comment) {
+    return comment.parentNode.parentNode.querySelector("span.score.likes").title <= downvote_limit;
+}
+
+function filter_upvotes(comment) {
+    return comment.parentNode.parentNode.querySelector("span.score.likes").title <= upvote_limit;
+}
+
 function get_subreddit_array() {
     let array = [];
 
@@ -305,8 +331,8 @@ function sort_ignore_caps(a, b) {
     return a.toLowerCase().localeCompare(b.toLowerCase());
 }
 
-function update_status_text(){
-    if(unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "FOUND " + unsafeWindow.comments.length + " COMMENTS"
+function update_status_text() {
+    if (unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "FOUND " + unsafeWindow.comments.length + " COMMENTS"
 }
 
 unsafeWindow.overwrite_delete = function (thing_id) {
