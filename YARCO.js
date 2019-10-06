@@ -11,28 +11,28 @@
 
 //EXTRA OPTIONS
 let generate_individual_delete_buttons = false //generate per comment delete and overwrite links
+let only_delete_old_comments = false //ignore comments newer than 24 hours
+let only_delete_by_subreddit = false //ignore comments from subreddits other than the one chosen in the dropdown
 let time_between_actions = 2000 //reddit API limit is 60 actions per minute so don't exceed that
-let only_delete_old_comments = true //disabled by default
 
 
-// TODO separate overwrite and delete
-// TODO only delete comments older than a day
-// TODO only delete comments from a certain subreddit
 // TODO check feedback for Reddit Overwrite for extra features
-// TODO consider caching comments array
+// TODO consider caching comments array OR not
 // TODO test Overview page
 // TODO add STOP button
-// TODO add optional confirmation dialog
+// TODO add optional confirmation dialog OR start up delay
 // TODO add status message while processing 
-
 
 // reddit username
 unsafeWindow.user = '';
 // array of comments (more precisely author tags)
 unsafeWindow.comments = [];
 // top section contents
-unsafeWindow.span = '';
+unsafeWindow.div = '';
 
+// subreddit selected for deletion
+unsafeWindow.subreddit = "ALL";
+unsafeWindow.subreddit_array = [];
 
 // on page loaded, initialize the script
 window.addEventListener("DOMContentLoaded", init_script, false);
@@ -56,16 +56,27 @@ function get_comments() {
     let comments = document.querySelectorAll("a.author");
 
     // filter out other authors
-    unsafeWindow.comments = [].filter.call(comments, filter_author)
+    unsafeWindow.comments = [].filter.call(comments, filter_author);
+
+    // if active, filter out comments from the past 24 hours
+    if (only_delete_old_comments) {
+        unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_time);
+    }
+
+    // if active, filter out comments from other subreddits than the chosen one
+    if (only_delete_by_subreddit && unsafeWindow.subreddit !== "ALL") {
+        unsafeWindow.comments = [].filter.call(comments, filter_subreddit);
+    }
 }
 
 // append buttons to page
 function generate_top_buttons() {
     if (unsafeWindow.comments.length) {
-        unsafeWindow.span = document.createElement("div");
-        unsafeWindow.span.setAttribute('class', 'nextprev secure_delete_all');
-        unsafeWindow.span.innerHTML = "";
-        unsafeWindow.span.style.marginBottom = "10px";
+        unsafeWindow.div = document.createElement("div");
+        unsafeWindow.div.setAttribute('class', 'nextprev secure_delete_all');
+        unsafeWindow.div.innerHTML = "";
+        unsafeWindow.div.style.marginBottom = "10px";
+        unsafeWindow.div.style.display = "flex";
 
         // make Overwrite and Delete All link
         let odlink = document.createElement("a");
@@ -76,9 +87,9 @@ function generate_top_buttons() {
         odlink.appendChild(document.createTextNode('OVERWRITE AND DELETE ' +
             unsafeWindow.comments.length +
             ' COMMENTS'));
-        unsafeWindow.span.appendChild(odlink);
+        unsafeWindow.div.appendChild(odlink);
         let br = document.createElement("br");
-        unsafeWindow.span.appendChild(br);
+        unsafeWindow.div.appendChild(br);
 
         // make Overwrite All link
         let olink = document.createElement("a");
@@ -86,14 +97,12 @@ function generate_top_buttons() {
         olink.setAttribute('onClick', 'javascript: recursive_process(true, false)');
         olink.setAttribute('href', 'javascript:void(0)');
         olink.style.marginLeft = "10px";
-        olink.style.position = "relative";
-        olink.style.top = "5px";
         olink.appendChild(document.createTextNode('OVERWRITE ' +
             unsafeWindow.comments.length +
             ' COMMENTS'));
-        unsafeWindow.span.appendChild(olink);
+        unsafeWindow.div.appendChild(olink);
         let br2 = document.createElement("br");
-        unsafeWindow.span.appendChild(br2);
+        unsafeWindow.div.appendChild(br2);
 
         // make Delete All link
         let dlink = document.createElement("a");
@@ -101,14 +110,12 @@ function generate_top_buttons() {
         dlink.setAttribute('onClick', 'javascript: recursive_process(false, true)');
         dlink.setAttribute('href', 'javascript:void(0)');
         dlink.style.marginLeft = "10px";
-        dlink.style.position = "relative";
-        dlink.style.top = "10px";
         dlink.appendChild(document.createTextNode('DELETE ' +
             unsafeWindow.comments.length +
             ' COMMENTS'));
-        unsafeWindow.span.appendChild(dlink);
+        unsafeWindow.div.appendChild(dlink);
 
-        // TODO test status message
+        // TODO add status message
         // let status_message = document.createTextNode("p");
         // status_message.innerHTML = "STATUS";
         // status_message.style.marginLeft = "10px";
@@ -116,12 +123,40 @@ function generate_top_buttons() {
         // status_message.style.top = "10px";
         // unsafeWindow.span.appendChild(status_message);
 
-        document.querySelector("div.content").insertBefore(unsafeWindow.span, document.querySelector("div.content").firstChild);
+        // make Subreddit Filter
+        //TODO add label
+        if (only_delete_by_subreddit) {
+            //Create array of subreddits from comments
+            unsafeWindow.subreddit_array = get_subreddit_array();
+
+            let selectList = document.createElement("select");
+            selectList.id = "subredditSelect";
+            selectList.style.marginLeft = "10px";
+            selectList.setAttribute('onChange', 'javascript: subreddit_select(this.value)')
+
+            let selectedTitle = document.createElement("option");
+            selectedTitle.selected = true;
+            selectedTitle.disabled = true;
+            selectedTitle.label = "Subreddit";
+            selectList.append(selectedTitle);
+
+            //Create and append the options
+            for (let i = 0; i < unsafeWindow.subreddit_array.length; i++) {
+                let option = document.createElement("option");
+                option.value = unsafeWindow.subreddit_array[i];
+                option.text = unsafeWindow.subreddit_array[i];
+                selectList.appendChild(option);
+            }
+            unsafeWindow.div.appendChild(selectList);
+        }
+
+        //add our div to the webpage
+        document.querySelector("div.content").insertBefore(unsafeWindow.div, document.querySelector("div.content").firstChild);
 
         //add per comment buttons (disabled by default)
         if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons()
-    } else if (unsafeWindow.span != null) {
-        unsafeWindow.span.style.display = 'none';
+    } else if (unsafeWindow.div != null) {
+        unsafeWindow.div.style.display = 'none';
     }
 }
 
@@ -238,7 +273,36 @@ unsafeWindow.delete_comment = function (thing_id) {
 
 //[UTILITY FUNCTIONS]
 function filter_author(comment) {
-    return comment.innerHTML == unsafeWindow.user
+    return comment.innerHTML == unsafeWindow.user;
+}
+
+function filter_time(comment) {
+    return comment.parentNode.parentNode.querySelector("time").innerHTML.indexOf("hour") === -1;
+}
+
+function filter_subreddit(comment) {
+    return comment.parentNode.parentNode.parentNode.querySelector("a.subreddit").innerHTML == unsafeWindow.subreddit;
+}
+
+function get_subreddit_array() {
+    let array = [];
+
+
+    for (let i = 0; i < unsafeWindow.comments.length; i++) {
+        let sub = unsafeWindow.comments[i].parentNode.parentNode.parentNode.querySelector("a.subreddit").innerHTML;
+
+        if (array.indexOf(sub) === -1) array.push(sub);
+    }
+
+    // Sort the array case insensitive and add option to disable subreddit filtering 
+    array = array.sort(sort_ignore_caps);
+    array.unshift("ALL");
+
+    return array;
+}
+
+function sort_ignore_caps(a, b) {
+    return a.toLowerCase().localeCompare(b.toLowerCase());
 }
 
 unsafeWindow.overwrite_delete = function (thing_id) {
@@ -264,10 +328,6 @@ unsafeWindow.generate_delete_buttons = function () {
             let main_parent = unsafeWindow.comments[i].parentNode.parentNode;
             let thing_id = main_parent.querySelector("form > input[name='thing_id']").value;
             let list = main_parent.querySelector("ul.flat-list");
-
-            //TODO REmove this
-            alert(main_parent.querySelector("time").innerHTML)
-            
 
             // if it already contains the tags, skip
             if (list.querySelector("li.secure_delete") && list.querySelector("li.overwrite")) continue;
@@ -297,9 +357,13 @@ unsafeWindow.generate_delete_buttons = function () {
             overwrite_link.appendChild(olink);
 
             main_parent.querySelector("ul.flat-list").appendChild(overwrite_link);
-
         } catch (e) {
             alert("Error adding Secure Delete links to comments.\nError: " + e + " Stack:" + e.stack);
         }
     }
+}
+
+unsafeWindow.subreddit_select = function (option) {
+    unsafeWindow.subreddit = option;
+    get_comments();
 }
