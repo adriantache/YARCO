@@ -9,12 +9,12 @@
 // ==/UserScript==
 
 
-//EXTRA OPTIONS
+//EXTRA OPTIONS (disabled by default)
 let generate_individual_delete_buttons = false //generate per comment delete and overwrite links
 let only_delete_old_comments = false //ignore comments newer than 24 hours
 let only_delete_by_subreddit = false //ignore comments from subreddits other than the one chosen in the dropdown
 let time_between_actions = 2000 //reddit API limit is 60 actions per minute so don't exceed that
-
+//TODO filter by comment score
 
 // TODO check feedback for Reddit Overwrite for extra features
 // TODO consider caching comments array OR not
@@ -33,6 +33,9 @@ unsafeWindow.div = '';
 // subreddit selected for deletion
 unsafeWindow.subreddit = "ALL";
 unsafeWindow.subreddit_array = [];
+
+//status text
+unsafeWindow.status_message = null;
 
 // on page loaded, initialize the script
 window.addEventListener("DOMContentLoaded", init_script, false);
@@ -67,6 +70,8 @@ function get_comments() {
     if (only_delete_by_subreddit && unsafeWindow.subreddit !== "ALL") {
         unsafeWindow.comments = [].filter.call(comments, filter_subreddit);
     }
+
+    update_status_text();
 }
 
 // append buttons to page
@@ -77,61 +82,16 @@ function generate_top_buttons() {
         unsafeWindow.div.innerHTML = "";
         unsafeWindow.div.style.marginBottom = "10px";
         unsafeWindow.div.style.display = "flex";
-
-        // make Overwrite and Delete All link
-        let odlink = document.createElement("a");
-        odlink.setAttribute('class', 'bylink');
-        odlink.setAttribute('onClick', 'javascript: recursive_process(true, true)');
-        odlink.setAttribute('href', 'javascript:void(0)');
-        odlink.style.marginLeft = "10px";
-        odlink.appendChild(document.createTextNode('OVERWRITE AND DELETE ' +
-            unsafeWindow.comments.length +
-            ' COMMENTS'));
-        unsafeWindow.div.appendChild(odlink);
-        let br = document.createElement("br");
-        unsafeWindow.div.appendChild(br);
-
-        // make Overwrite All link
-        let olink = document.createElement("a");
-        olink.setAttribute('class', 'bylink');
-        olink.setAttribute('onClick', 'javascript: recursive_process(true, false)');
-        olink.setAttribute('href', 'javascript:void(0)');
-        olink.style.marginLeft = "10px";
-        olink.appendChild(document.createTextNode('OVERWRITE ' +
-            unsafeWindow.comments.length +
-            ' COMMENTS'));
-        unsafeWindow.div.appendChild(olink);
-        let br2 = document.createElement("br");
-        unsafeWindow.div.appendChild(br2);
-
-        // make Delete All link
-        let dlink = document.createElement("a");
-        dlink.setAttribute('class', 'bylink');
-        dlink.setAttribute('onClick', 'javascript: recursive_process(false, true)');
-        dlink.setAttribute('href', 'javascript:void(0)');
-        dlink.style.marginLeft = "10px";
-        dlink.appendChild(document.createTextNode('DELETE ' +
-            unsafeWindow.comments.length +
-            ' COMMENTS'));
-        unsafeWindow.div.appendChild(dlink);
-
-        // TODO add status message
-        // let status_message = document.createTextNode("p");
-        // status_message.innerHTML = "STATUS";
-        // status_message.style.marginLeft = "10px";
-        // status_message.style.position = "relative";
-        // status_message.style.top = "10px";
-        // unsafeWindow.span.appendChild(status_message);
+        unsafeWindow.div.style.justifyContent = "flex-start";
+        unsafeWindow.div.style.alignItems = "center";
 
         // make Subreddit Filter
-        //TODO add label
         if (only_delete_by_subreddit) {
             //Create array of subreddits from comments
             unsafeWindow.subreddit_array = get_subreddit_array();
 
             let selectList = document.createElement("select");
             selectList.id = "subredditSelect";
-            selectList.style.marginLeft = "10px";
             selectList.setAttribute('onChange', 'javascript: subreddit_select(this.value)')
 
             let selectedTitle = document.createElement("option");
@@ -150,10 +110,50 @@ function generate_top_buttons() {
             unsafeWindow.div.appendChild(selectList);
         }
 
+        // make Status message
+        let status_div = document.createElement("div");
+        status_div.style.marginLeft = "10px";
+        unsafeWindow.status_message = document.createElement("p");
+        unsafeWindow.status_message.setAttribute('class', 'status_message');
+        unsafeWindow.status_message.innerHTML = "FOUND " + unsafeWindow.comments.length + " COMMENTS";
+        status_div.appendChild(unsafeWindow.status_message);
+        unsafeWindow.div.appendChild(status_div);
+
+        // make Overwrite and Delete All link
+        let odlink = document.createElement("a");
+        odlink.setAttribute('class', 'bylink');
+        odlink.setAttribute('onClick', 'javascript: recursive_process(true, true)');
+        odlink.setAttribute('href', 'javascript:void(0)');
+        odlink.style.marginLeft = "10px";
+        odlink.appendChild(document.createTextNode('OVERWRITE AND DELETE'));
+        unsafeWindow.div.appendChild(odlink);
+        let br = document.createElement("br");
+        unsafeWindow.div.appendChild(br);
+
+        // make Overwrite All link
+        let olink = document.createElement("a");
+        olink.setAttribute('class', 'bylink');
+        olink.setAttribute('onClick', 'javascript: recursive_process(true, false)');
+        olink.setAttribute('href', 'javascript:void(0)');
+        olink.style.marginLeft = "10px";
+        olink.appendChild(document.createTextNode('OVERWRITE'));
+        unsafeWindow.div.appendChild(olink);
+        let br2 = document.createElement("br");
+        unsafeWindow.div.appendChild(br2);
+
+        // make Delete All link
+        let dlink = document.createElement("a");
+        dlink.setAttribute('class', 'bylink');
+        dlink.setAttribute('onClick', 'javascript: recursive_process(false, true)');
+        dlink.setAttribute('href', 'javascript:void(0)');
+        dlink.style.marginLeft = "10px";
+        dlink.appendChild(document.createTextNode('DELETE'));
+        unsafeWindow.div.appendChild(dlink);
+
         //add our div to the webpage
         document.querySelector("div.content").insertBefore(unsafeWindow.div, document.querySelector("div.content").firstChild);
 
-        //add per comment buttons (disabled by default)
+        //add individual comment buttons
         if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons()
     } else if (unsafeWindow.div != null) {
         unsafeWindow.div.style.display = 'none';
@@ -303,6 +303,10 @@ function get_subreddit_array() {
 
 function sort_ignore_caps(a, b) {
     return a.toLowerCase().localeCompare(b.toLowerCase());
+}
+
+function update_status_text(){
+    if(unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "FOUND " + unsafeWindow.comments.length + " COMMENTS"
 }
 
 unsafeWindow.overwrite_delete = function (thing_id) {
