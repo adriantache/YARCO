@@ -14,6 +14,7 @@ let show_overwrite_button = false //show separate button to overwrite
 let show_delete_button = false //show separate button to delete
 let generate_individual_delete_buttons = false //generate per comment delete and overwrite links
 let only_delete_old_comments = false //ignore comments newer than 24 hours
+let old_comments_limit = 1 //if above is active, number of days after which a comment is considered old
 let only_delete_by_subreddit = false //ignore comments from subreddits other than the one chosen in the dropdown
 let time_between_actions = 2000 //reddit API limit is 60 actions per minute so don't exceed that
 let only_delete_downvoted = false //only delete comments under a certain karma
@@ -21,8 +22,6 @@ let downvote_limit = 1 //if above is active, only delete comments with karma <= 
 let ignore_upvoted = false //ignore comments over a certain karma (useless if only_delete_downvoted is active)
 let upvote_limit = 100 //if above is active, ignore comments with karma >= to this
 let auto_delete = false //automatically delete comments when navigating to comments page (use with filters!)
-//TODO consider upvote/downvote limit change
-//TODO improve delete_old_comments functionality (mention number of days)
 //TODO reload page on completion
 
 // TODO check feedback for Reddit Overwrite for extra features
@@ -60,7 +59,7 @@ function init_script(ev) {
 
     // automatically start deletion process instead of generating buttons, if active
     if (auto_delete) {
-        recursive_process(true, true);
+        unsafeWindow.recursive_process(true, true);
     }
     else {
         // generate the top buttons
@@ -95,7 +94,7 @@ function get_comments() {
         unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_upvotes)
     }
 
-    update_status_text();
+    if (unsafeWindow.status_message !== null) update_status_text();
 }
 
 // append buttons to page
@@ -139,7 +138,7 @@ function generate_top_buttons() {
         status_div.style.marginLeft = "10px";
         unsafeWindow.status_message = document.createElement("p");
         unsafeWindow.status_message.setAttribute('class', 'status_message');
-        unsafeWindow.status_message.innerHTML = "";
+        unsafeWindow.status_message.innerHTML = "ERROR";
         status_div.appendChild(unsafeWindow.status_message);
         unsafeWindow.div.appendChild(status_div);
 
@@ -180,6 +179,9 @@ function generate_top_buttons() {
 
         //add our div to the webpage
         document.querySelector("div.content").insertBefore(unsafeWindow.div, document.querySelector("div.content").firstChild);
+
+        //update status text now that we have defined unsafeWindow.status_message
+        update_status_text();
 
         //add individual comment buttons
         if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons()
@@ -305,7 +307,14 @@ function filter_author(comment) {
 }
 
 function filter_time(comment) {
-    return comment.parentNode.parentNode.querySelector("time").innerHTML.indexOf("hour") === -1;
+    let time = comment.parentNode.parentNode.querySelector("time").innerHTML;
+
+    //always exclude comments from the past day
+    if (time.indexOf("hour") !== -1) return false;
+
+    let num_days = time.split(" ");
+
+    return num_days[0] >= old_comments_limit;
 }
 
 function filter_subreddit(comment) {
@@ -322,7 +331,6 @@ function filter_upvotes(comment) {
 
 function get_subreddit_array() {
     let array = [];
-
 
     for (let i = 0; i < unsafeWindow.comments.length; i++) {
         let sub = unsafeWindow.comments[i].parentNode.parentNode.parentNode.querySelector("a.subreddit").innerHTML;
@@ -342,20 +350,23 @@ function sort_ignore_caps(a, b) {
 }
 
 function update_status_text() {
-    if (unsafeWindow.status_message) {
-        let message = "FOUND " + unsafeWindow.comments.length + " COMMENT";
+    console.log(unsafeWindow.status_message)
 
-        if (unsafeWindow.comments.length > 1) message += "S";
+    if (unsafeWindow.status_message === null) return;
 
-        if ((only_delete_by_subreddit && unsafeWindow.subreddit !== "ALL") ||
-            only_delete_downvoted ||
-            ignore_upvoted ||
-            only_delete_old_comments) {
-            message += "\n(filters active)";
-        }
+    let message = "FOUND " + unsafeWindow.comments.length + " COMMENT";
+    if (unsafeWindow.comments.length > 1) message += "S";
 
-        unsafeWindow.status_message.innerHTML = message;
+    if ((only_delete_by_subreddit && unsafeWindow.subreddit !== "ALL") ||
+        only_delete_downvoted ||
+        ignore_upvoted ||
+        only_delete_old_comments) {
+        message += "\n(filters active)";
     }
+
+    console.log(unsafeWindow.status_message.innerHTML)
+    unsafeWindow.status_message.innerHTML = message;
+    console.log(unsafeWindow.status_message.innerHTML)
 }
 
 unsafeWindow.overwrite_delete = function (thing_id) {
