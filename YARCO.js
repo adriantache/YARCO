@@ -320,7 +320,7 @@ function filter_time(comment) {
     let time = comment.parentNode.parentNode.querySelector("time").innerHTML;
 
     //always exclude comments from the past day
-    if (time.indexOf("hour") !== -1) return false;
+    if (time.indexOf("days") === -1) return false;
 
     let num_days = time.split(" ");
 
