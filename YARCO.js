@@ -20,6 +20,10 @@ let only_delete_downvoted = false //only delete comments under a certain karma
 let downvote_limit = 1 //if above is active, only delete comments with karma <= to this
 let ignore_upvoted = false //ignore comments over a certain karma (useless if only_delete_downvoted is active)
 let upvote_limit = 100 //if above is active, ignore comments with karma >= to this
+let auto_delete = false //automatically delete comments when navigating to comments page (use with filters!)
+//TODO consider upvote/downvote limit change
+//TODO improve delete_old_comments functionality (mention number of days)
+//TODO reload page on completion
 
 // TODO check feedback for Reddit Overwrite for extra features
 // TODO consider caching comments array OR not
@@ -51,11 +55,17 @@ function init_script(ev) {
     // if not logged in exit
     if (!unsafeWindow.user) return;
 
-    //retrieve all VISIBLE comments
+    // retrieve all VISIBLE comments
     get_comments()
 
-    // generate the top buttons
-    generate_top_buttons();
+    // automatically start deletion process instead of generating buttons, if active
+    if (auto_delete) {
+        recursive_process(true, true);
+    }
+    else {
+        // generate the top buttons
+        generate_top_buttons();
+    }
 }
 
 function get_comments() {
@@ -129,7 +139,7 @@ function generate_top_buttons() {
         status_div.style.marginLeft = "10px";
         unsafeWindow.status_message = document.createElement("p");
         unsafeWindow.status_message.setAttribute('class', 'status_message');
-        unsafeWindow.status_message.innerHTML = "FOUND " + unsafeWindow.comments.length + " COMMENTS";
+        unsafeWindow.status_message.innerHTML = "";
         status_div.appendChild(unsafeWindow.status_message);
         unsafeWindow.div.appendChild(status_div);
 
@@ -332,25 +342,38 @@ function sort_ignore_caps(a, b) {
 }
 
 function update_status_text() {
-    if (unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "FOUND " + unsafeWindow.comments.length + " COMMENTS"
+    if (unsafeWindow.status_message) {
+        let message = "FOUND " + unsafeWindow.comments.length + " COMMENT";
+
+        if (unsafeWindow.comments.length > 1) message += "S";
+
+        if ((only_delete_by_subreddit && unsafeWindow.subreddit !== "ALL") ||
+            only_delete_downvoted ||
+            ignore_upvoted ||
+            only_delete_old_comments) {
+            message += "\n(filters active)";
+        }
+
+        unsafeWindow.status_message.innerHTML = message;
+    }
 }
 
 unsafeWindow.overwrite_delete = function (thing_id) {
-    unsafeWindow.overwrite_comment(thing_id)
-    unsafeWindow.setTimeout(unsafeWindow.delete_comment, time_between_actions, thing_id)
+    unsafeWindow.overwrite_comment(thing_id);
+    unsafeWindow.setTimeout(unsafeWindow.delete_comment, time_between_actions, thing_id);
 }
 
 //function to regenerate secure delete buttons after only overwriting a comment
 unsafeWindow.overwrite_reload = function (thing_id) {
-    unsafeWindow.overwrite_comment(thing_id)
-    unsafeWindow.setTimeout(unsafeWindow.generate_delete_buttons, 500)
+    unsafeWindow.overwrite_comment(thing_id);
+    unsafeWindow.setTimeout(unsafeWindow.generate_delete_buttons, 500);
 }
 
 
 //[EXTRA FEATURES]
 //Add a "SECURE DELETE" button near each comment delete button
 unsafeWindow.generate_delete_buttons = function () {
-    get_comments()
+    get_comments();
 
     for (let i = 0; i < unsafeWindow.comments.length; i++) {
         try {
