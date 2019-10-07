@@ -28,6 +28,9 @@ let reload_on_completion = false //reload page on completion
 // TODO add optional confirmation dialog OR start up delay
 // TODO add logic to avoid posts and enable using script on other user pages (Overview and Submitted)
 // TODO check compatibility with new reddit
+// TODO implement dictionary instead of random characters to defeat overwrite detection 
+
+// TODO [BUG] fix comment selection on self-posts
 
 // reddit username
 unsafeWindow.user = '';
@@ -41,6 +44,7 @@ unsafeWindow.status_message = null;
 // subreddit selected for deletion
 unsafeWindow.subreddit = "ALL";
 unsafeWindow.subreddit_array = [];
+
 
 // on page loaded, initialize the script
 window.addEventListener("DOMContentLoaded", init_script, false);
@@ -212,7 +216,7 @@ unsafeWindow.start_processing_comments = function (overwrite_all, delete_all) {
     }
 
     //set status message while working
-    if(unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "Processing...";
+    if (unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "Processing...";
 }
 
 unsafeWindow.overwrite_all = function (comments, also_delete) {
@@ -228,7 +232,7 @@ unsafeWindow.overwrite_all = function (comments, also_delete) {
     //if there are still comments left, get next comment
     //increase timeout if also deleting 
     if (comments.length) unsafeWindow.setTimeout(unsafeWindow.overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments, also_delete);
-    else if (reload_on_completion) unsafeWindow.location.reload();
+    else if (reload_on_completion) unsafeWindow.setTimeout(reload_page, time_between_actions * 5);
     else get_comments();
 }
 
@@ -237,7 +241,7 @@ unsafeWindow.delete_all = function (comments) {
 
     //if there are still comments left, get next comment 
     if (comments.length) unsafeWindow.setTimeout(unsafeWindow.delete_all, time_between_actions, comments);
-    else if (reload_on_completion) unsafeWindow.location.reload();
+    else if (reload_on_completion) unsafeWindow.setTimeout(reload_page, time_between_actions * 5);
     else get_comments();
 }
 
@@ -319,7 +323,7 @@ function filter_time(comment) {
 
     let num_days = time.split(" ");
 
-    return num_days[0] >= old_comments_limit;
+    return parseInt(num_days[0]) >= old_comments_limit;
 }
 
 function filter_subreddit(comment) {
@@ -327,11 +331,15 @@ function filter_subreddit(comment) {
 }
 
 function filter_downvotes(comment) {
-    return comment.parentNode.parentNode.querySelector("span.score.likes").title <= downvote_limit;
+    return parseInt(comment.parentNode.parentNode.querySelector("span.score.likes").title) <= downvote_limit;
 }
 
 function filter_upvotes(comment) {
-    return comment.parentNode.parentNode.querySelector("span.score.likes").title <= upvote_limit;
+    return parseInt(comment.parentNode.parentNode.querySelector("span.score.likes").title) <= upvote_limit;
+}
+
+function reload_page(){
+    unsafeWindow.location.reload();
 }
 
 function get_subreddit_array() {
@@ -355,8 +363,6 @@ function sort_ignore_caps(a, b) {
 }
 
 function update_status_text() {
-    console.log(unsafeWindow.status_message)
-
     if (unsafeWindow.status_message === null) return;
 
     let message = "FOUND " + unsafeWindow.comments.length + " COMMENT";
@@ -369,9 +375,7 @@ function update_status_text() {
         message += "\n(filters active)";
     }
 
-    console.log(unsafeWindow.status_message.innerHTML)
     unsafeWindow.status_message.innerHTML = message;
-    console.log(unsafeWindow.status_message.innerHTML)
 }
 
 unsafeWindow.overwrite_delete = function (thing_id) {
@@ -389,12 +393,13 @@ unsafeWindow.overwrite_reload = function (thing_id) {
 //[EXTRA FEATURES]
 //Add a "SECURE DELETE" button near each comment delete button
 unsafeWindow.generate_delete_buttons = function () {
-    get_comments();
+    // find all author tags to bypass filters applied to main comments array
+    let comments = document.querySelectorAll("a.author");
 
-    for (let i = 0; i < unsafeWindow.comments.length; i++) {
+    for (let i = 0; i < comments.length; i++) {
         try {
             // get the parent
-            let main_parent = unsafeWindow.comments[i].parentNode.parentNode;
+            let main_parent = comments[i].parentNode.parentNode;
             let thing_id = main_parent.querySelector("form > input[name='thing_id']").value;
             let list = main_parent.querySelector("ul.flat-list");
 
