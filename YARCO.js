@@ -24,9 +24,6 @@ let upvote_limit = 100 //if above is active, ignore comments with karma >= to th
 let auto_delete = false //automatically delete comments when navigating to comments page (use with filters!)
 let reload_on_completion = false //reload page on completion
 
-// TODO check feedback for Reddit Overwrite for extra features
-// TODO consider caching comments array OR not
-// TODO test Overview page
 // TODO add STOP button
 // TODO add optional confirmation dialog OR start up delay
 // TODO add status message while processing 
@@ -288,7 +285,7 @@ unsafeWindow.delete_comment = function (thing_id) {
 
         // if status is submitting, there may be an internet connectivity error, so we retry
         if (status.indexOf("submitting") != -1) {
-            unsafeWindow.setTimeout(unsafeWindow.delete_comment, time_between_actions * 5, thing_id);
+            unsafeWindow.setTimeout(unsafeWindow.delete_comment, time_between_actions * 2.5, thing_id);
             return;
         }
 
