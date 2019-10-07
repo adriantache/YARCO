@@ -13,14 +13,14 @@
 let show_overwrite_button = false //show separate button to overwrite 
 let show_delete_button = false //show separate button to delete
 let generate_individual_delete_buttons = false //generate per comment delete and overwrite links
-let only_delete_old_comments = false //ignore comments newer than 24 hours
-let old_comments_limit = 1 //if above is active, number of days after which a comment is considered old
+let only_delete_old_comments = false //ignore comments newer than the limit below
+let old_comments_limit = 2 //if above is active, number of days after which a comment is considered old
 let only_delete_by_subreddit = false //ignore comments from subreddits other than the one chosen in the dropdown
 let time_between_actions = 2000 //reddit API limit is 60 actions per minute so don't exceed that
 let only_delete_downvoted = false //only delete comments under a certain karma
-let downvote_limit = 1 //if above is active, only delete comments with karma <= to this
+let downvote_limit = -1 //if above is active, only delete comments with karma <= to this
 let ignore_upvoted = false //ignore comments over a certain karma (useless if only_delete_downvoted is active)
-let upvote_limit = 100 //if above is active, ignore comments with karma >= to this
+let upvote_limit = 50 //if above is active, ignore comments with karma >= to this
 let auto_delete = false //automatically delete comments when navigating to comments page (use with filters!)
 let reload_on_completion = false //reload page on completion
 
