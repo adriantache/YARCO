@@ -22,7 +22,7 @@ let downvote_limit = 1 //if above is active, only delete comments with karma <= 
 let ignore_upvoted = false //ignore comments over a certain karma (useless if only_delete_downvoted is active)
 let upvote_limit = 100 //if above is active, ignore comments with karma >= to this
 let auto_delete = false //automatically delete comments when navigating to comments page (use with filters!)
-//TODO reload page on completion
+let reload_on_completion = false //reload page on completion
 
 // TODO check feedback for Reddit Overwrite for extra features
 // TODO consider caching comments array OR not
@@ -227,6 +227,7 @@ unsafeWindow.overwrite_all = function (comments, also_delete) {
     //if there are still comments left, get next comment
     //increase timeout if also deleting 
     if (comments.length) unsafeWindow.setTimeout(unsafeWindow.overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments, also_delete);
+    else if (reload_on_completion) unsafeWindow.location.reload();
 }
 
 unsafeWindow.delete_all = function (comments) {
@@ -234,6 +235,7 @@ unsafeWindow.delete_all = function (comments) {
 
     //if there are still comments left, get next comment 
     if (comments.length) unsafeWindow.setTimeout(unsafeWindow.delete_all, time_between_actions, comments);
+    else if (reload_on_completion) unsafeWindow.location.reload();
 }
 
 unsafeWindow.overwrite_comment = function (thing_id) {
