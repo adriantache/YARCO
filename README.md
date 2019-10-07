@@ -7,7 +7,15 @@ The script only deletes comments that are loaded onto the page, if you have RES 
 
 This is essentially [Reddit Overwrite script v.1.4.8](https://greasyfork.org/en/scripts/10380-reddit-overwrite) with a number of modifications. 
 
-You can use it as such in Firefox or use something like TamperMonkey to install it in Chrome.
+**Features (inactive by default):**
+* Overwrite and delete all comments *(active by default)*
+* Separate overwrite and delete functionality, for all comments or each comment
+* Ignore comments newer than specified limit (default 1 day)
+* Delete comments from only a specific subreddit
+* Delete comments based on karma (target only downvoted comments or ignore upvoted comments)
+* Automatically delete comments when visiting comments page (to be used with the filters above)
+
+You can use it as such in Firefox or use something like TamperMonkey to install it in Chrome. It probably only works on the old version on reddit, and it's meant to be used on your comments or overview page. It might get stuck on posts, so I recomend only using it on the comments page.
 
 This repo exists because I couldn't really find a central repository for this script and I wanted to add my own tweaks to how it works (primarily remove the ad message).
 
