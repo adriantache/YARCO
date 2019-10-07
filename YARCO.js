@@ -35,7 +35,7 @@ unsafeWindow.user = '';
 // array of comments (more precisely author tags)
 unsafeWindow.comments = [];
 // top section contents
-unsafeWindow.div = '';
+unsafeWindow.div = null;
 //status text
 unsafeWindow.status_message = null;
 
@@ -189,7 +189,9 @@ function generate_top_buttons() {
         //add individual comment buttons
         if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons()
     } else if (unsafeWindow.div != null) {
-        unsafeWindow.div.style.display = 'none';
+        document.querySelector("div.content")
+            .insertBefore(document.createTextNode("No comments found."),
+                document.querySelector("div.content").firstChild);
     }
 }
 
