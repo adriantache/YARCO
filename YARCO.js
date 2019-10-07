@@ -191,7 +191,7 @@ function generate_top_buttons() {
     } else {
         document.querySelector("div.content")
             .insertBefore(document.createTextNode("YARCO: No comments found. Please check your" +
-                "active filters and try again"),
+                "active filters and try again."),
                 document.querySelector("div.content").firstChild);
     }
 }
