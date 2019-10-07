@@ -76,6 +76,9 @@ function get_comments() {
     // filter out other authors
     unsafeWindow.comments = [].filter.call(comments, filter_author);
 
+    // remove duplicates to fix double processing of comments to own posts
+    unsafeWindow.comments = filter_duplicates(unsafeWindow.comments);
+
     // if active, filter out comments from the past 24 hours
     if (only_delete_old_comments) {
         unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_time);
@@ -338,7 +341,27 @@ function filter_upvotes(comment) {
     return parseInt(comment.parentNode.parentNode.querySelector("span.score.likes").title) <= upvote_limit;
 }
 
-function reload_page(){
+function filter_duplicates(comments) {
+    let array = [];
+
+    // For self-posts, the same author tag will show up twice, once for the post author and
+    //then for the comment author. this gets the thing_id for that tag and if there are two
+    //consecutive tags it only keeps the second one. Otherwise, the script would process some
+    //comments twice, leading to some filters not working properly. 
+    for (let i = 0; i < comments.length - 1; i++) {
+        let this_comment = comments[i].parentNode.parentNode.querySelector("form.usertext > input[name='thing_id']").value;
+        let next_comment = comments[i + 1].parentNode.parentNode.querySelector("form.usertext > input[name='thing_id']").value;
+
+        if (this_comment != next_comment) array.push(comments[i]);
+    }
+
+    //since the loop excludes the final item, add it here (will be a comment author)
+    array.push(comments[comments.length - 1])
+
+    return array;
+}
+
+function reload_page() {
     unsafeWindow.location.reload();
 }
 
