@@ -2,8 +2,8 @@
 // @name        Yet Another Reddit Comment Overwriter
 // @namespace   https://github.com/adriantache/YARCO/
 // @description Local script to overwrite all your comments with random ASCII characters and delete them. This works because Reddit doesn't store editing history, so technically this is the only way to obfuscate the contents of the comments. Based on Reddit Overwrite script v.1.4.8.
-// @include     https://*.reddit.com/user/*
-// @include     http://*.reddit.com/user/*
+// @include     https://*.reddit.com/user/*/comments/
+// @include     http://*.reddit.com/user/*/comments/
 // @version     0.1
 // @run-at      document-start
 // ==/UserScript==
@@ -26,7 +26,8 @@ let reload_on_completion = false //reload page on completion
 
 // TODO add STOP button
 // TODO add optional confirmation dialog OR start up delay
-// TODO add status message while processing 
+// TODO add logic to avoid posts and enable using script on other user pages (Overview and Submitted)
+// TODO check compatibility with new reddit
 
 // reddit username
 unsafeWindow.user = '';
@@ -56,7 +57,7 @@ function init_script(ev) {
 
     // automatically start deletion process instead of generating buttons, if active
     if (auto_delete) {
-        unsafeWindow.recursive_process(true, true);
+        unsafeWindow.start_processing_comments(true, true);
     }
     else {
         // generate the top buttons
@@ -142,7 +143,7 @@ function generate_top_buttons() {
         // make Overwrite and Delete All link
         let odlink = document.createElement("a");
         odlink.setAttribute('class', 'bylink');
-        odlink.setAttribute('onClick', 'javascript: recursive_process(true, true)');
+        odlink.setAttribute('onClick', 'javascript: start_processing_comments(true, true)');
         odlink.setAttribute('href', 'javascript:void(0)');
         odlink.style.marginLeft = "10px";
         odlink.appendChild(document.createTextNode('OVERWRITE AND DELETE'));
@@ -154,7 +155,7 @@ function generate_top_buttons() {
             // make Overwrite All link
             let olink = document.createElement("a");
             olink.setAttribute('class', 'bylink');
-            olink.setAttribute('onClick', 'javascript: recursive_process(true, false)');
+            olink.setAttribute('onClick', 'javascript: start_processing_comments(true, false)');
             olink.setAttribute('href', 'javascript:void(0)');
             olink.style.marginLeft = "10px";
             olink.appendChild(document.createTextNode('OVERWRITE'));
@@ -167,7 +168,7 @@ function generate_top_buttons() {
             // make Delete All link
             let dlink = document.createElement("a");
             dlink.setAttribute('class', 'bylink');
-            dlink.setAttribute('onClick', 'javascript: recursive_process(false, true)');
+            dlink.setAttribute('onClick', 'javascript: start_processing_comments(false, true)');
             dlink.setAttribute('href', 'javascript:void(0)');
             dlink.style.marginLeft = "10px";
             dlink.appendChild(document.createTextNode('DELETE'));
@@ -187,7 +188,7 @@ function generate_top_buttons() {
     }
 }
 
-unsafeWindow.recursive_process = function (overwrite_all, delete_all) {
+unsafeWindow.start_processing_comments = function (overwrite_all, delete_all) {
     //get comments again in case the user has scrolled and revealed more comments
     get_comments()
 
@@ -209,6 +210,9 @@ unsafeWindow.recursive_process = function (overwrite_all, delete_all) {
     } else if (delete_all) {
         unsafeWindow.delete_all(commentsArray);
     }
+
+    //set status message while working
+    if(unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "Processing...";
 }
 
 unsafeWindow.overwrite_all = function (comments, also_delete) {
@@ -225,6 +229,7 @@ unsafeWindow.overwrite_all = function (comments, also_delete) {
     //increase timeout if also deleting 
     if (comments.length) unsafeWindow.setTimeout(unsafeWindow.overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments, also_delete);
     else if (reload_on_completion) unsafeWindow.location.reload();
+    else get_comments();
 }
 
 unsafeWindow.delete_all = function (comments) {
@@ -233,6 +238,7 @@ unsafeWindow.delete_all = function (comments) {
     //if there are still comments left, get next comment 
     if (comments.length) unsafeWindow.setTimeout(unsafeWindow.delete_all, time_between_actions, comments);
     else if (reload_on_completion) unsafeWindow.location.reload();
+    else get_comments();
 }
 
 unsafeWindow.overwrite_comment = function (thing_id) {
