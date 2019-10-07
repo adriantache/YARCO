@@ -181,7 +181,8 @@ function generate_top_buttons() {
         }
 
         //add our div to the webpage
-        document.querySelector("div.content").insertBefore(unsafeWindow.div, document.querySelector("div.content").firstChild);
+        document.querySelector("div.content")
+            .insertBefore(unsafeWindow.div, document.querySelector("div.content").firstChild);
 
         //update status text now that we have defined unsafeWindow.status_message
         update_status_text();
@@ -189,10 +190,11 @@ function generate_top_buttons() {
         //add individual comment buttons
         if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons()
     } else {
-        document.querySelector("div.content")
-            .insertBefore(document.createTextNode("YARCO: No comments found. Please check your" +
-                "active filters and try again."),
-                document.querySelector("div.content").firstChild);
+        let div = document.createElement("div");
+        div.style.marginLeft = "15px";
+        div.innerHTML = "YARCO: No comments found. Please check your active filters and try again.";
+
+        document.querySelector("div.content").insertBefore(div, document.querySelector("div.content").firstChild);
     }
 }
 
