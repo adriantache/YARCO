@@ -188,9 +188,10 @@ function generate_top_buttons() {
 
         //add individual comment buttons
         if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons()
-    } else if (unsafeWindow.div != null) {
+    } else {
         document.querySelector("div.content")
-            .insertBefore(document.createTextNode("No comments found."),
+            .insertBefore(document.createTextNode("YARCO: No comments found. Please check your" +
+                "active filters and try again"),
                 document.querySelector("div.content").firstChild);
     }
 }
