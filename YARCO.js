@@ -30,8 +30,6 @@ let reload_on_completion = false //reload page on completion
 // TODO check compatibility with new reddit
 // TODO implement dictionary instead of random characters to defeat overwrite detection 
 
-// TODO [BUG] fix comment selection on self-posts
-
 // reddit username
 unsafeWindow.user = '';
 // array of comments (more precisely author tags)
