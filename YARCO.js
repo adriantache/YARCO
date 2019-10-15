@@ -294,6 +294,9 @@ unsafeWindow.delete_comment = function (thing_id) {
         let thing = document.querySelector("input[name='thing_id'][value='" + thing_id + "']");
         let status = thing.parentNode.querySelector("div.usertext-edit > div.bottom-area > div.usertext-buttons > span.status").innerHTML;
 
+        //TODO remove this, just testing out where the weird bug is coming from
+        if(status === null) throw Error("Status is null");
+
         if (status.indexOf("error") != -1) {
             alert("Failed to overwrite comment " + thing_id + " due to an unknown reddit error, skipping.");
             return;
@@ -307,11 +310,16 @@ unsafeWindow.delete_comment = function (thing_id) {
 
         // find delete button and click it and then yes confirmation button
         let del_form = thing.parentNode.parentNode.querySelector("ul.buttons > li > form.del-button");
+
+        //TODO remove this, just testing out where the weird bug is coming from
+        if(del_form === null) throw Error("Del_form is null");
+
         unsafeWindow.toggle(del_form.querySelector("span.main > a"));
         del_form.querySelector("span.error > a.yes").click();
 
     } catch (e) {
         alert("Error deleting comment: " + e);
+        console.log(e.stack);
     }
 }
 
