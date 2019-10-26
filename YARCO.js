@@ -187,9 +187,6 @@ function generate_top_buttons() {
 
         //update status text now that we have defined unsafeWindow.status_message
         update_status_text();
-
-        //add individual comment buttons
-        if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons()
     } else {
         let div = document.createElement("div");
         div.style.marginLeft = "15px";
@@ -197,6 +194,9 @@ function generate_top_buttons() {
 
         document.querySelector("div.content").insertBefore(div, document.querySelector("div.content").firstChild);
     }
+
+    //add individual comment buttons
+    if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons()
 }
 
 unsafeWindow.start_processing_comments = function (overwrite_all, delete_all) {
@@ -439,8 +439,12 @@ unsafeWindow.overwrite_reload = function (thing_id) {
 //[EXTRA FEATURES]
 //Add a "SECURE DELETE" button near each comment delete button
 unsafeWindow.generate_delete_buttons = function () {
-    // find all author tags to bypass filters applied to main comments array
+    // first get comments again to bypass any active filters (see get_comments() for explanation)
     let comments = document.querySelectorAll("a.author");
+    comments = [].filter.call(comments, filter_author);
+    comments = filter_duplicates(comments);
+
+    console.log("Secure delete comments", comments)
 
     for (let i = 0; i < comments.length; i++) {
         try {
@@ -449,8 +453,8 @@ unsafeWindow.generate_delete_buttons = function () {
             let thing_id = main_parent.querySelector("form > input[name='thing_id']").value;
             let list = main_parent.querySelector("ul.flat-list");
 
-            // if it already contains the tags, skip
-            if (list.querySelector("li.secure_delete") && list.querySelector("li.overwrite")) continue;
+            // if it already contains the tags, skip [probably not needed now that we filter duplicates, will test and remove]
+            // if (list.querySelector("li.secure_delete") && list.querySelector("li.overwrite")) continue;
 
             // add SECURE DELETE link to comments
             let secure_delete_link = document.createElement("li");
