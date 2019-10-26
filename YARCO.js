@@ -24,6 +24,7 @@ let upvote_limit = 50 //if above is active, ignore comments with karma >= to thi
 let auto_delete = false //automatically delete comments when navigating to comments page (use with filters!)
 let reload_on_completion = false //reload page on completion
 
+// TODO fix secure delete buttons
 // TODO add STOP button
 // TODO add optional confirmation dialog OR start up delay
 // TODO add logic to avoid posts and enable using script on other user pages (Overview and Submitted)
@@ -238,7 +239,11 @@ unsafeWindow.overwrite_all = function (comments, also_delete) {
     //if there are still comments left, get next comment
     //increase timeout if also deleting 
     if (comments.length) unsafeWindow.setTimeout(unsafeWindow.overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments, also_delete);
-    else if (reload_on_completion) unsafeWindow.setTimeout(reload_page, time_between_actions * 5);
+    else if (reload_on_completion) {
+        if (unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "Reloading page...";
+
+        unsafeWindow.setTimeout(reload_page, time_between_actions * 5);
+    }
     else get_comments();
 }
 
@@ -247,7 +252,11 @@ unsafeWindow.delete_all = function (comments) {
 
     //if there are still comments left, get next comment 
     if (comments.length) unsafeWindow.setTimeout(unsafeWindow.delete_all, time_between_actions, comments);
-    else if (reload_on_completion) unsafeWindow.setTimeout(reload_page, time_between_actions * 5);
+    else if (reload_on_completion) {
+        if (unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "Reloading page...";
+
+        unsafeWindow.setTimeout(reload_page, time_between_actions * 5);
+    }
     else get_comments();
 }
 
@@ -373,6 +382,9 @@ function filter_duplicates(comments) {
 }
 
 function reload_page() {
+    //scroll to top first to prevent scrolling to the last deleted comment position after reload
+    unsafeWindow.scrollTo(0, 0);
+
     unsafeWindow.location.reload();
 }
 
