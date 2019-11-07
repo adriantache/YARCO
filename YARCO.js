@@ -4,7 +4,7 @@
 // @description Local script to overwrite all your comments with random ASCII characters and delete them. This works because Reddit doesn't store editing history, so technically this is the only way to obfuscate the contents of the comments. Based on Reddit Overwrite script v.1.4.8.
 // @include     https://*.reddit.com/user/*/comments/
 // @include     http://*.reddit.com/user/*/comments/
-// @version     0.1
+// @version     0.2
 // @run-at      document-start
 // ==/UserScript==
 
@@ -21,10 +21,11 @@ let only_delete_downvoted = false //only delete comments under a certain karma
 let downvote_limit = -1 //if above is active, only delete comments with karma <= to this
 let ignore_upvoted = false //ignore comments over a certain karma (useless if only_delete_downvoted is active)
 let upvote_limit = 50 //if above is active, ignore comments with karma >= to this
-let auto_delete = false //automatically delete comments when navigating to comments page (use with filters!)
+let auto_delete = false //automatically delete comments when navigating to comments page [[USE WITH FILTERS!]]
 let reload_on_completion = false //reload page on completion
 
-// TODO fix secure delete buttons
+let setDefaultSettings = false //set the default options I use [[overrides all the above]]
+
 // TODO add STOP button
 // TODO add optional confirmation dialog OR start up delay
 // TODO add logic to avoid posts and enable using script on other user pages (Overview and Submitted)
@@ -49,6 +50,9 @@ unsafeWindow.subreddit_array = [];
 window.addEventListener("DOMContentLoaded", init_script, false);
 
 function init_script(ev) {
+    //if activated, set default settings for the extra options above
+    if (setDefaultSettings) setDefaults();
+
     // get logged in username
     unsafeWindow.user = document.querySelector("span.user > a:not(.login-required)").innerHTML;
 
@@ -56,7 +60,7 @@ function init_script(ev) {
     if (!unsafeWindow.user) return;
 
     // retrieve all VISIBLE comments
-    get_comments()
+    get_comments();
 
     // automatically start deletion process instead of generating buttons, if active
     if (auto_delete) {
@@ -90,12 +94,12 @@ function get_comments() {
 
     // if active, filter out non downvoted comments
     if (only_delete_downvoted) {
-        unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_downvotes)
+        unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_downvotes);
     }
 
     // if active, filter out upvoted comments
     if (ignore_upvoted) {
-        unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_upvotes)
+        unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_upvotes);
     }
 
     if (unsafeWindow.status_message !== null) update_status_text();
@@ -196,12 +200,12 @@ function generate_top_buttons() {
     }
 
     //add individual comment buttons
-    if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons()
+    if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons();
 }
 
 unsafeWindow.start_processing_comments = function (overwrite_all, delete_all) {
     //get comments again in case the user has scrolled and revealed more comments
-    get_comments()
+    get_comments();
 
     let commentsArray = [];
 
@@ -313,7 +317,7 @@ unsafeWindow.delete_comment = function (thing_id) {
         let status = thing.parentNode.querySelector("div.usertext-edit > div.bottom-area > div.usertext-buttons > span.status").innerHTML;
 
         //TODO remove this, just testing out where the weird bug is coming from
-        if(status === null) throw Error("Status is null");
+        if (status === null) throw Error("Status is null");
 
         if (status.indexOf("error") != -1) {
             alert("Failed to overwrite comment " + thing_id + " due to an unknown reddit error, skipping.");
@@ -330,7 +334,7 @@ unsafeWindow.delete_comment = function (thing_id) {
         let del_form = thing.parentNode.parentNode.querySelector("ul.buttons > li > form.del-button");
 
         //TODO remove this, just testing out where the weird bug is coming from
-        if(del_form === null) throw Error("Del_form is null");
+        if (del_form === null) throw Error("Del_form is null");
 
         unsafeWindow.toggle(del_form.querySelector("span.main > a"));
         del_form.querySelector("span.error > a.yes").click();
@@ -385,7 +389,7 @@ function filter_duplicates(comments) {
     }
 
     //since the loop excludes the final item, add it here (will be a comment author)
-    array.push(comments[comments.length - 1])
+    array.push(comments[comments.length - 1]);
 
     return array;
 }
@@ -444,6 +448,10 @@ unsafeWindow.overwrite_reload = function (thing_id) {
     unsafeWindow.setTimeout(unsafeWindow.generate_delete_buttons, 500);
 }
 
+unsafeWindow.subreddit_select = function (option) {
+    unsafeWindow.subreddit = option;
+    get_comments();
+}
 
 //[EXTRA FEATURES]
 //Add a "SECURE DELETE" button near each comment delete button
@@ -487,12 +495,16 @@ unsafeWindow.generate_delete_buttons = function () {
             list.appendChild(overwrite_link);
         } catch (e) {
             alert("Error adding Secure Delete links to comments.\nError: " + e);
-            console.log(e.stack)
+            console.log(e.stack);
         }
     }
 }
 
-unsafeWindow.subreddit_select = function (option) {
-    unsafeWindow.subreddit = option;
-    get_comments();
+//sets the defaults I like (tired of copy pasting for every update)
+function setDefaults() {
+    generate_individual_delete_buttons = true;
+    only_delete_old_comments = true;
+    ignore_upvoted = true;
+    upvote_limit = 10;
+    reload_on_completion = true;
 }
