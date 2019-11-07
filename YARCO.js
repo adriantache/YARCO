@@ -265,6 +265,14 @@ unsafeWindow.overwrite_comment = function (thing_id) {
         //find edit form (hidden on page but active)
         let edit_form = document.querySelector("input[name='thing_id'][value='" + thing_id + "']").parentNode;
 
+        //todo remove this debug code
+        //potentially change the way we find this form and its buttons (i.e. find edit button first)
+        console.log("Input: ", document.querySelector("input[name='thing_id']"))
+        console.log("Edit form: ", document.querySelector("input[name='thing_id'][value='" + thing_id + "']"))
+        console.log("Edit form parent: ", edit_form)
+        console.log("Edit form parent parent: ", edit_form.parentNode)
+
+
         //if comment is currently being edited, cancel out of that 
         let edit_cancel_btn = edit_form.querySelector("div.usertext-edit > div.bottom-area > div.usertext-buttons > button.cancel");
         edit_cancel_btn.click();
@@ -294,6 +302,7 @@ unsafeWindow.overwrite_comment = function (thing_id) {
         edit_save_btn.click();
     } catch (e) {
         alert("Error interacting with overwrite form: " + e);
+        console.log(e.stack);
     }
 }
 
@@ -444,17 +453,12 @@ unsafeWindow.generate_delete_buttons = function () {
     comments = [].filter.call(comments, filter_author);
     comments = filter_duplicates(comments);
 
-    console.log("Secure delete comments", comments)
-
     for (let i = 0; i < comments.length; i++) {
         try {
             // get the parent
             let main_parent = comments[i].parentNode.parentNode;
             let thing_id = main_parent.querySelector("form > input[name='thing_id']").value;
             let list = main_parent.querySelector("ul.flat-list");
-
-            // if it already contains the tags, skip [probably not needed now that we filter duplicates, will test and remove]
-            // if (list.querySelector("li.secure_delete") && list.querySelector("li.overwrite")) continue;
 
             // add SECURE DELETE link to comments
             let secure_delete_link = document.createElement("li");
@@ -467,7 +471,7 @@ unsafeWindow.generate_delete_buttons = function () {
             dlink.appendChild(document.createTextNode('SECURE DELETE'));
             secure_delete_link.appendChild(dlink);
 
-            main_parent.querySelector("ul.flat-list").appendChild(secure_delete_link);
+            list.appendChild(secure_delete_link);
 
             // add OVERWRITE link to comments
             let overwrite_link = document.createElement("li");
@@ -480,9 +484,10 @@ unsafeWindow.generate_delete_buttons = function () {
             olink.appendChild(document.createTextNode('OVERWRITE'));
             overwrite_link.appendChild(olink);
 
-            main_parent.querySelector("ul.flat-list").appendChild(overwrite_link);
+            list.appendChild(overwrite_link);
         } catch (e) {
-            alert("Error adding Secure Delete links to comments.\nError: " + e + " Stack:" + e.stack);
+            alert("Error adding Secure Delete links to comments.\nError: " + e);
+            console.log(e.stack)
         }
     }
 }
