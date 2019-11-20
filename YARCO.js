@@ -4,12 +4,14 @@
 // @description Local script to overwrite all your comments with random ASCII characters and delete them. This works because Reddit doesn't store editing history, so technically this is the only way to obfuscate the contents of the comments. Based on Reddit Overwrite script v.1.4.8.
 // @include     https://*.reddit.com/user/*/comments/
 // @include     http://*.reddit.com/user/*/comments/
-// @version     0.2
+// @version     0.3
 // @run-at      document-start
 // ==/UserScript==
 
 
 //EXTRA OPTIONS (disabled by default)
+let setDefaultSettings = false //set the default options I use [[overrides all the below]]
+
 let show_overwrite_button = false //show separate button to overwrite 
 let show_delete_button = false //show separate button to delete
 let generate_individual_delete_buttons = false //generate per comment delete and overwrite links
@@ -24,7 +26,8 @@ let upvote_limit = 50 //if above is active, ignore comments with karma >= to thi
 let auto_delete = false //automatically delete comments when navigating to comments page [[USE WITH FILTERS!]]
 let reload_on_completion = false //reload page on completion
 
-let setDefaultSettings = false //set the default options I use [[overrides all the above]]
+//DEBUG
+let safeMode = false //process comments without performing any actions, used for debugging
 
 // TODO add STOP button
 // TODO add optional confirmation dialog OR start up delay
@@ -52,6 +55,7 @@ window.addEventListener("DOMContentLoaded", init_script, false);
 function init_script(ev) {
     //if activated, set default settings for the extra options above
     if (setDefaultSettings) setDefaults();
+    if (safeMode) setSafeModeDefaults();
 
     // get logged in username
     unsafeWindow.user = document.querySelector("span.user > a:not(.login-required)").innerHTML;
@@ -213,6 +217,12 @@ unsafeWindow.start_processing_comments = function (overwrite_all, delete_all) {
         //for each author, get ID of the input field of the comment
         let thing_id = unsafeWindow.comments[i].parentNode.parentNode.querySelector("form.usertext > input[name='thing_id']").value;
 
+        //TODO remove this
+        if (!thing_id) {
+            console.log("ERROR! Thing ID undefined for", unsafeWindow.comments[i]);
+            continue;
+        }
+
         if (commentsArray.indexOf(thing_id) == -1) {
             commentsArray.push(thing_id);
         }
@@ -242,13 +252,13 @@ unsafeWindow.overwrite_all = function (comments, also_delete) {
 
     //if there are still comments left, get next comment
     //increase timeout if also deleting 
-    if (comments.length) unsafeWindow.setTimeout(unsafeWindow.overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments, also_delete);
-    else if (reload_on_completion) {
+    if (comments.length) {
+        unsafeWindow.setTimeout(unsafeWindow.overwrite_all, also_delete ? time_between_actions * 2 : time_between_actions, comments, also_delete);
+    } else if (reload_on_completion) {
         if (unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "Reloading page...";
 
         unsafeWindow.setTimeout(reload_page, time_between_actions * 5);
-    }
-    else get_comments();
+    } else get_comments();
 }
 
 unsafeWindow.delete_all = function (comments) {
@@ -265,17 +275,15 @@ unsafeWindow.delete_all = function (comments) {
 }
 
 unsafeWindow.overwrite_comment = function (thing_id) {
+    if (safeMode) {
+        console.log(`Safe mode active! Accessing overwrite function for ${thing_id}.`);
+        //add your debug code here
+        return;
+    }
+
     try {
         //find edit form (hidden on page but active)
-        let edit_form = document.querySelector("input[name='thing_id'][value='" + thing_id + "']").parentNode;
-
-        //todo remove this debug code
-        //potentially change the way we find this form and its buttons (i.e. find edit button first)
-        console.log("Input: ", document.querySelector("input[name='thing_id']"))
-        console.log("Edit form: ", document.querySelector("input[name='thing_id'][value='" + thing_id + "']"))
-        console.log("Edit form parent: ", edit_form)
-        console.log("Edit form parent parent: ", edit_form.parentNode)
-
+        let edit_form = document.querySelector(`input[name="thing_id"][value="${thing_id}"]`).parentNode;
 
         //if comment is currently being edited, cancel out of that 
         let edit_cancel_btn = edit_form.querySelector("div.usertext-edit > div.bottom-area > div.usertext-buttons > button.cancel");
@@ -311,6 +319,12 @@ unsafeWindow.overwrite_comment = function (thing_id) {
 }
 
 unsafeWindow.delete_comment = function (thing_id) {
+    if (safeMode) {
+        console.log(`Safe mode active! Accessing delete function for ${thing_id}.`);
+        //add your debug code here
+        return;
+    }
+
     try {
         // get current status of comment editing box to prevent deleting comment before overwrite is complete
         let thing = document.querySelector("input[name='thing_id'][value='" + thing_id + "']");
@@ -367,11 +381,11 @@ function filter_subreddit(comment) {
 }
 
 function filter_downvotes(comment) {
-    return parseInt(comment.parentNode.parentNode.querySelector("span.score.likes").title) <= downvote_limit;
+    return comment.parentNode.querySelector("span.score.likes").title <= downvote_limit;
 }
 
 function filter_upvotes(comment) {
-    return parseInt(comment.parentNode.parentNode.querySelector("span.score.likes").title) <= upvote_limit;
+    return comment.parentNode.querySelector("span.score.likes").title <= upvote_limit;
 }
 
 function filter_duplicates(comments) {
@@ -507,4 +521,10 @@ function setDefaults() {
     ignore_upvoted = true;
     upvote_limit = 10;
     reload_on_completion = true;
+}
+
+//if we are in safe mode we're not interacting with reddit so we eliminate the delays
+function setSafeModeDefaults() {
+    time_between_actions = 0;
+    reload_on_completion = false;
 }
