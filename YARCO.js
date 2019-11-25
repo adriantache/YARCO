@@ -34,6 +34,7 @@ let safeMode = false //process comments without performing any actions, used for
 // TODO add logic to avoid posts and enable using script on other user pages (Overview and Submitted)
 // TODO check compatibility with new reddit
 // TODO implement dictionary instead of random characters to defeat overwrite detection 
+// TODO add buttons to exclude individual comments
 
 // reddit username
 unsafeWindow.user = '';
@@ -106,7 +107,7 @@ function get_comments() {
         unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_upvotes);
     }
 
-    if (unsafeWindow.status_message !== null) update_status_text();
+    update_status_text();
 }
 
 // append buttons to page
@@ -381,11 +382,21 @@ function filter_subreddit(comment) {
 }
 
 function filter_downvotes(comment) {
-    return comment.parentNode.querySelector("span.score.likes").title <= downvote_limit;
+    let score = comment.parentNode.parentNode.querySelector("span.score.likes")
+
+    //if we do not have a score (may be hidden) we exclude the comment for this filter
+    if (score == null || score.title == null) return false
+
+    return score.title <= downvote_limit;
 }
 
 function filter_upvotes(comment) {
-    return comment.parentNode.querySelector("span.score.likes").title <= upvote_limit;
+    let score = comment.parentNode.parentNode.querySelector("span.score.likes")
+
+    //if we do not have a score (may be hidden) we include the comment for this filter
+    if (score == null || score.title == null) return true
+
+    return score.title <= upvote_limit;
 }
 
 function filter_duplicates(comments) {
@@ -438,6 +449,11 @@ function sort_ignore_caps(a, b) {
 function update_status_text() {
     if (unsafeWindow.status_message === null) return;
 
+    if (noCommentsFound()) {
+        unsafeWindow.status_message = "Problem getting comments!";
+        console.log("No comments found!", unsafeWindow.comments)
+    }
+
     let message = "FOUND " + unsafeWindow.comments.length + " COMMENT";
     if (unsafeWindow.comments.length > 1) message += "S";
 
@@ -449,6 +465,12 @@ function update_status_text() {
     }
 
     unsafeWindow.status_message.innerHTML = message;
+}
+
+function noCommentsFound() {
+    return unsafeWindow.comments == null ||
+        unsafeWindow.comments.length == 0 ||
+        unsafeWindow.comments.some(value => value == null);
 }
 
 unsafeWindow.overwrite_delete = function (thing_id) {
