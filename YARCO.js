@@ -10,7 +10,7 @@
 
 
 //EXTRA OPTIONS (disabled by default)
-let setDefaultSettings = false //set the default options I use [[overrides all the below]]
+let set_default_settings = false //set the default options I use [[overrides all the below]]
 
 let show_overwrite_button = false //show separate button to overwrite 
 let show_delete_button = false //show separate button to delete
@@ -25,6 +25,7 @@ let ignore_upvoted = false //ignore comments over a certain karma (useless if on
 let upvote_limit = 50 //if above is active, ignore comments with karma >= to this
 let auto_delete = false //automatically delete comments when navigating to comments page [[USE WITH FILTERS!]]
 let reload_on_completion = false //reload page on completion
+let highlight_comments = false //highlight comments selected for deletion
 
 //DEBUG
 let safeMode = false //process comments without performing any actions, used for debugging
@@ -35,6 +36,7 @@ let safeMode = false //process comments without performing any actions, used for
 // TODO check compatibility with new reddit
 // TODO implement dictionary instead of random characters to defeat overwrite detection 
 // TODO add buttons to exclude individual comments
+// TODO add color coding to comments selected for deletion (or to exclude buttons)
 
 // reddit username
 unsafeWindow.user = '';
@@ -55,7 +57,7 @@ window.addEventListener("DOMContentLoaded", init_script, false);
 
 function init_script(ev) {
     //if activated, set default settings for the extra options above
-    if (setDefaultSettings) setDefaults();
+    if (set_default_settings) setDefaults();
     if (safeMode) setSafeModeDefaults();
 
     // get logged in username
@@ -108,6 +110,7 @@ function get_comments() {
     }
 
     update_status_text();
+    if(highlight_comments) update_highlighting();
 }
 
 // append buttons to page
@@ -238,7 +241,9 @@ unsafeWindow.start_processing_comments = function (overwrite_all, delete_all) {
     }
 
     //set status message while working
-    if (unsafeWindow.status_message) unsafeWindow.status_message.innerHTML = "Processing...";
+    if (unsafeWindow.status_message) {
+        unsafeWindow.status_message.innerHTML = `Processing... ${unsafeWindow.comments.length} comments left.`;
+    }
 }
 
 unsafeWindow.overwrite_all = function (comments, also_delete) {
@@ -467,6 +472,14 @@ function update_status_text() {
     unsafeWindow.status_message.innerHTML = message;
 }
 
+function update_highlighting(){
+    unsafeWindow.comments.forEach((value) => {
+        let bottomBar = value.parentNode.parentNode.parentNode.querySelector(".child");
+        bottomBar.style.height = "5px";
+        bottomBar.style.background = "red";
+    })
+}
+
 function noCommentsFound() {
     return unsafeWindow.comments == null ||
         unsafeWindow.comments.length == 0 ||
@@ -543,6 +556,7 @@ function setDefaults() {
     ignore_upvoted = true;
     upvote_limit = 10;
     reload_on_completion = true;
+    highlight_comments = true;
 }
 
 //if we are in safe mode we're not interacting with reddit so we eliminate the delays
