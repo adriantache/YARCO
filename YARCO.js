@@ -4,7 +4,7 @@
 // @description Local script to overwrite all your comments with random ASCII characters and delete them. This works because Reddit doesn't store editing history, so technically this is the only way to obfuscate the contents of the comments. Based on Reddit Overwrite script v.1.4.8.
 // @include     https://*.reddit.com/user/*/comments/
 // @include     http://*.reddit.com/user/*/comments/
-// @version     0.3
+// @version     0.4
 // @run-at      document-start
 // ==/UserScript==
 
@@ -26,6 +26,7 @@ let upvote_limit = 50 //if above is active, ignore comments with karma >= to thi
 let auto_delete = false //automatically delete comments when navigating to comments page [[USE WITH FILTERS!]]
 let reload_on_completion = false //reload page on completion
 let highlight_comments = false //highlight comments selected for deletion
+let generate_comment_exclusion_buttons = false //generate buttons to prevent certain comments from being deleted
 
 //DEBUG
 let safeMode = false //process comments without performing any actions, used for debugging
@@ -50,6 +51,9 @@ unsafeWindow.status_message = null;
 // subreddit selected for deletion
 unsafeWindow.subreddit = "ALL";
 unsafeWindow.subreddit_array = [];
+//store comments to be skipped from overwrite/delete
+unsafeWindow.comment_exclusion_array = [];
+
 
 
 // on page loaded, initialize the script
@@ -89,6 +93,11 @@ function get_comments() {
     // remove duplicates to fix double processing of comments to own posts
     unsafeWindow.comments = filter_duplicates(unsafeWindow.comments);
 
+    //if active, filter out excluded comments
+    if (generate_comment_exclusion_buttons && unsafeWindow.comment_exclusion_array.length !== 0) {
+        unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_exclusion);
+    }
+
     // if active, filter out comments from the past 24 hours
     if (only_delete_old_comments) {
         unsafeWindow.comments = [].filter.call(unsafeWindow.comments, filter_time);
@@ -110,7 +119,7 @@ function get_comments() {
     }
 
     update_status_text();
-    if(highlight_comments) update_highlighting();
+    if (highlight_comments) update_highlighting();
 }
 
 // append buttons to page
@@ -193,6 +202,18 @@ function generate_top_buttons() {
             unsafeWindow.div.appendChild(dlink);
         }
 
+        if (safeMode) {
+            // make Safe Mode message
+            let safe_mode_div = document.createElement("div");
+            safe_mode_div.style.marginLeft = "10px";
+            let safe_mode_message = document.createElement("p");
+            safe_mode_message.setAttribute('class', 'safe_mode_message');
+            safe_mode_message.style.color = "green";
+            safe_mode_message.innerHTML = "Safe Mode Active";
+            safe_mode_div.appendChild(safe_mode_message);
+            unsafeWindow.div.appendChild(safe_mode_div);
+        }
+
         //add our div to the webpage
         document.querySelector("div.content")
             .insertBefore(unsafeWindow.div, document.querySelector("div.content").firstChild);
@@ -209,6 +230,9 @@ function generate_top_buttons() {
 
     //add individual comment buttons
     if (generate_individual_delete_buttons) unsafeWindow.generate_delete_buttons();
+
+    //add comment exclusion buttons
+    if (generate_comment_exclusion_buttons) unsafeWindow.generate_exclusion_buttons();
 }
 
 unsafeWindow.start_processing_comments = function (overwrite_all, delete_all) {
@@ -371,6 +395,10 @@ function filter_author(comment) {
     return comment.innerHTML == unsafeWindow.user;
 }
 
+function filter_exclusion(comment) {
+    return unsafeWindow.comment_exclusion_array.indexOf(comment) === -1;
+}
+
 function filter_time(comment) {
     let time = comment.parentNode.parentNode.querySelector("time").innerHTML;
 
@@ -472,12 +500,22 @@ function update_status_text() {
     unsafeWindow.status_message.innerHTML = message;
 }
 
-function update_highlighting(){
+function update_highlighting() {
     unsafeWindow.comments.forEach((value) => {
         let bottomBar = value.parentNode.parentNode.parentNode.querySelector(".child");
         bottomBar.style.height = "5px";
-        bottomBar.style.background = "red";
+        bottomBar.style.width = "20%";
+        if (safeMode) bottomBar.style.background = "green";
+        else bottomBar.style.background = "red";
     })
+
+    //remove the bottom bar for excluded comments
+    if (generate_comment_exclusion_buttons && comment_exclusion_array.length != 0) {
+        comment_exclusion_array.forEach(value => {
+            let bottomBar = value.parentNode.parentNode.parentNode.querySelector(".child");
+            bottomBar.style.height = "0px";
+        })
+    }
 }
 
 function noCommentsFound() {
@@ -499,6 +537,17 @@ unsafeWindow.overwrite_reload = function (thing_id) {
 
 unsafeWindow.subreddit_select = function (option) {
     unsafeWindow.subreddit = option;
+    get_comments();
+}
+
+unsafeWindow.exclude_comment = function (thing_id) {
+    let comment = thing_id.parentNode.parentNode;
+    let authorTag = comment.querySelector("a.author")
+
+    if (unsafeWindow.comment_exclusion_array.indexOf(authorTag) == -1) {
+        unsafeWindow.comment_exclusion_array.push(authorTag);
+    }
+
     get_comments();
 }
 
@@ -549,6 +598,41 @@ unsafeWindow.generate_delete_buttons = function () {
     }
 }
 
+//Add an "EXCLUDE" button near each comment delete button
+unsafeWindow.generate_exclusion_buttons = function () {
+    get_comments();
+
+    for (let i = 0; i < unsafeWindow.comments.length; i++) {
+        let comment = unsafeWindow.comments[i];
+
+        try {
+            // get the parent
+            let main_parent = comment.parentNode.parentNode;
+            let thing_id = main_parent.querySelector("form > input[name='thing_id']");
+            let list = main_parent.querySelector("ul.flat-list");
+
+            // add EXCLUDE link to comments
+            let exclude_link = document.createElement("li");
+            exclude_link.setAttribute('class', 'exclude');
+
+            let elink = document.createElement("a");
+            elink.setAttribute('class', 'bylink exclude');
+            elink.onclick = function () {
+                exclude_comment(thing_id)
+            }
+            // elink.setAttribute('onClick', 'javascript: exclude_comment("' + thing_id + '")');
+            elink.setAttribute('href', 'javascript:void(0)');
+            elink.appendChild(document.createTextNode('EXCLUDE'));
+            exclude_link.appendChild(elink);
+
+            list.appendChild(exclude_link);
+        } catch (e) {
+            alert("Error adding Exclude links to comments.\nError: " + e);
+            console.log(e.stack);
+        }
+    }
+}
+
 //sets the defaults I like (tired of copy pasting for every update)
 function setDefaults() {
     generate_individual_delete_buttons = true;
@@ -557,6 +641,7 @@ function setDefaults() {
     upvote_limit = 10;
     reload_on_completion = true;
     highlight_comments = true;
+    generate_comment_exclusion_buttons = true;
 }
 
 //if we are in safe mode we're not interacting with reddit so we eliminate the delays
